@@ -1,0 +1,1 @@
+纯前端页面、UI 组件、资源加载；若用框架可再拆 components/, pages/, assets/。
