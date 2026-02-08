@@ -3,7 +3,7 @@
 #include "equip.h"
 #include <unordered_map>
 #include <vector>
-
+#include <string>
 // ==================== 物品模板 ====================
 struct ItemTemplate {
     int id;
@@ -74,6 +74,8 @@ public:
         auto it = equipments_.find(equipId);
         return it != equipments_.end() ? &it->second : nullptr;
     }
+    bool loadFromFile(const std::string& path);
+    void clear() { items_.clear(); equipments_.clear(); setBonuses_.clear(); }
     
     // 创建装备实例（随机词缀）
     Equipment createEquipment(int equipId) const;
@@ -113,3 +115,6 @@ private:
 
 #define GET_ITEM(id) ItemConfig::instance().getItem(id)
 #define CREATE_EQUIP(id) ItemConfig::instance().createEquipment(id)
+#define REG_ITEM(tmpl) ItemConfig::instance().regItem(tmpl)
+#define REG_EQUIP(tmpl) ItemConfig::instance().regEquipment(tmpl)
+#define REG_SET_BONUS(bonus) ItemConfig::instance().regSetBonus(bonus)

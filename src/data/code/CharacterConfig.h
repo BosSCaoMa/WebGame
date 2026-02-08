@@ -15,6 +15,7 @@ struct CharacterTemplate {
     std::string name;
     QualityType quality; 
     Position position;
+    int relId = 0;  // 关联角色ID，用于合击技能
     // ===== 技能 =====
     std::vector<int> skillIds;      // 技能ID列表
     
@@ -45,6 +46,7 @@ public:
     Character create(int charId) const;
     
     // 注册武将模板
+    bool loadFromFile(const std::string& path);
     void reg(const CharacterTemplate& tmpl) {
         templates_[tmpl.id] = tmpl;
     }
@@ -58,42 +60,12 @@ private:
     CharacterConfig& operator=(const CharacterConfig&) = delete;
     
     std::unordered_map<int, CharacterTemplate> templates_;
-
-    // void initCharacters();
-    // void initBaseCharacters();
-    // void InitShuCharacters();
-    // void InitWuCharacters();
-    // void InitWeiCharacters();
-    // void InitQunCharacters();
-    // void InitShenCharacters();
-    // void addHero(int id, const char* name, QualityType quality, Position pos,
-    //     std::initializer_list<int> skills);
-    // void InitShuRedCharacters();
-    // void InitShuOrangeCharacters();
-    // void InitShuPurpleCharacters();
-    // void InitShuBlueCharacters();
-    // void InitShuGreenCharacters();
-    // void InitWuRedCharacters();
-    // void InitWuOrangeCharacters();
-    // void InitWuPurpleCharacters();
-    // void InitWuBlueCharacters();
-    // void InitWuGreenCharacters();
-    // void InitWeiRedCharacters();
-    // void InitWeiOrangeCharacters();
-    // void InitWeiPurpleCharacters();
-    // void InitWeiBlueCharacters();
-    // void InitWeiGreenCharacters();
-    // void InitQunRedCharacters();
-    // void InitQunOrangeCharacters();
-    // void InitQunPurpleCharacters();
-    // void InitQunBlueCharacters();
-    // void InitQunGreenCharacters();
 };
 
 // ==================== 便捷访问宏 ====================
 #define GET_CHAR_TMPL(id) CharacterConfig::instance().get(id)
 #define CREATE_CHAR(id, lv, star) CharacterConfig::instance().create(id, lv, star)
-
+#define REG_CHAR(tmpl) CharacterConfig::instance().reg(tmpl)
 // 约定定义
 /*
 0 - 999 基础：小兵等等

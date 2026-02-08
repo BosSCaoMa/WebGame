@@ -3,7 +3,7 @@
 #include "Skill.h"
 #include <unordered_map>
 #include <functional>
-
+#include <string>
 // ==================== 技能配置管理器 ====================
 class SkillConfig {
 public:
@@ -14,6 +14,9 @@ public:
         
     }
     
+    // 配置读取
+    bool loadFromFile(const std::string& path);
+    void clear() { skills_.clear(); }
     // 获取技能（返回副本）
     Skill get(int skillId) const {
         auto it = skills_.find(skillId);
@@ -42,17 +45,6 @@ private:
     using E = EffectType;
     using Tr = SkillTrigger;
     using SE = SkillEffect;
-    // void initSkills();
-    // void initQunSkills();
-    // void initWeiSkills();
-    // void initShuSkills();
-    // void initWuSkills();
-    // void initShenSkills();
-    // void initBaseSkills();
-    // void initEquipSkills();
-    // void initFourEquipSkills();
-    // void initMountAndGeneralSkills();
-    // void initTreasureSkills();
     std::unordered_map<int, Skill> skills_;
 };
 
