@@ -497,8 +497,8 @@ void BattleManager::applyEffect(BattleCharacter* caster, BattleCharacter* target
         }
 
         case EffectType::TRANSFER_DEBUFF: {
-            // todo
-            log("  - " + target->name + " 触发效果：负面转移（TODO）");
+            BattleCharacter* transTarget = selectEnemyTarget(target, target->battleId > 0 ? enemyTeam_ : userTeam_);
+            target->transferDebuffsTo(transTarget, calculateValue(caster, effect, target));
             break;
         }
 

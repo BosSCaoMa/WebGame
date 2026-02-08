@@ -45,16 +45,6 @@ enum class TargetType {
 };
 
 // ==================== 数值计算类型 ====================
-enum class ValueType {
-    FIXED = 0,          // 固定值
-    PERCENT_ATK,        // 攻击力百分比
-    PERCENT_DEF,        // 防御力百分比
-    PERCENT_MAX_HP,     // 最大生命值百分比
-    PERCENT_CUR_HP,     // 当前生命值百分比
-    PERCENT_LOST_HP,    // 已损失生命值
-    PERCENT_TARGET_MAXHP,  // 目标最大生命值百分比
-};
-
 enum class ValueSource {
     FIXED,      // 固定值
     ATK,        // 攻击力

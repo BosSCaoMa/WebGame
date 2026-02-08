@@ -3,7 +3,7 @@
 #include "BattleTypes.h"
 #include "BattleAttr.h"
 #include "Skill.h"
-#include "Item.h"
+#include "equip.h"
 #include <string>
 #include <unordered_map>
 #include <vector>

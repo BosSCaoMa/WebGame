@@ -13,7 +13,7 @@ struct EquipmentAffix { // 暂不使用
     EquipmentAffix() : type(AffixType::NONE), value(0) {}
     EquipmentAffix(AffixType t, int64_t v) : type(t), value(v) {}
     
-    std::string getDescription() const; // 获取词缀描述
+    std::string getDescription() const {return "";}; // 获取词缀描述
 };
 
 // ==================== 装备 ====================

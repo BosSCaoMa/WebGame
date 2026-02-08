@@ -2,7 +2,7 @@
 
 #include "BattleTypes.h"
 #include "Character.h"
-#include "Item.h"
+#include "equip.h"
 #include <string>
 #include <map>
 #include <vector>
