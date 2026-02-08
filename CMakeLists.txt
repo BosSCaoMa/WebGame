@@ -27,10 +27,33 @@ list(APPEND GAMECLIENT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 add_executable(WebGame ${GAMECLIENT_SOURCES})
 target_link_libraries(WebGame PRIVATE LogM)
 
-target_include_directories(WebGame PRIVATE
+set(PROJECT_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib"
 )
+
+file(GLOB_RECURSE PROJECT_HEADER_FILES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.hpp"
+)
+
+foreach(header ${PROJECT_HEADER_FILES})
+  get_filename_component(header_dir "${header}" DIRECTORY)
+  list(APPEND PROJECT_INCLUDE_DIRS "${header_dir}")
+endforeach()
+list(REMOVE_DUPLICATES PROJECT_INCLUDE_DIRS)
+
+target_include_directories(WebGame PRIVATE ${PROJECT_INCLUDE_DIRS})
+
+file(GLOB_RECURSE ALL_HEADERS 
+  LIST_DIRECTORIES false
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"    # src/下所有.h（含子文件夹）
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.h"    # lib/下所有.h（含子文件夹）
+)
+
+target_sources(WebGame PRIVATE ${ALL_HEADERS})
 
 # ---- 平台链接 ----
 if(WIN32)
