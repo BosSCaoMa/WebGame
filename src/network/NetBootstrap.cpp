@@ -1,6 +1,7 @@
 #include "NetBootstrap.h"
 
 #include "EventLoop.h"
+#include "EventLoopGroup.h"
 #include "LoginAcceptor.h"
 #include "TcpConnection.h"
 
@@ -22,15 +23,16 @@ bool NetBootstrap::Start() {
         return true;
     }
 
-    eventLoop_ = std::make_unique<EventLoop>(config_, dispatcher_, diag_);
-    if (!eventLoop_->Start()) {
+    loopGroup_ = std::make_unique<EventLoopGroup>(config_, dispatcher_, diag_);
+    if (!loopGroup_->Start()) {
+        loopGroup_.reset();
         return false;
     }
 
-    acceptor_ = std::make_unique<LoginAcceptor>(config_, *eventLoop_, diag_);
+    acceptor_ = std::make_unique<LoginAcceptor>(config_, *loopGroup_, diag_);
     if (!acceptor_->Start()) {
-        eventLoop_->Stop();
-        eventLoop_.reset();
+        loopGroup_->Stop();
+        loopGroup_.reset();
         return false;
     }
 
@@ -46,11 +48,11 @@ void NetBootstrap::Stop() {
     if (acceptor_) {
         acceptor_->Stop();
     }
-    if (eventLoop_) {
-        eventLoop_->Stop();
+    if (loopGroup_) {
+        loopGroup_->Stop();
     }
     acceptor_.reset();
-    eventLoop_.reset();
+    loopGroup_.reset();
     started_ = false;
     LOG_INFO("NetBootstrap stopped");
 }

@@ -1,6 +1,7 @@
 #include "LoginAcceptor.h"
 
 #include "EventLoop.h"
+#include "EventLoopGroup.h"
 #include "NetDiag.h"
 
 #include "LogM.h"
@@ -29,8 +30,8 @@ std::string Trim(const std::string& input) {
 
 namespace webgame::net {
 
-LoginAcceptor::LoginAcceptor(const NetConfig& config, EventLoop& loop, NetDiag& diag)
-    : config_(config), loop_(loop), diag_(diag) {}
+LoginAcceptor::LoginAcceptor(const NetConfig& config, EventLoopGroup& loopGroup, NetDiag& diag)
+    : config_(config), loopGroup_(loopGroup), diag_(diag) {}
 
 LoginAcceptor::~LoginAcceptor() {
     Stop();
@@ -117,8 +118,9 @@ void LoginAcceptor::AcceptLoop() {
 
         diag_.IncAccepted();
         auto attachFd = fd;
-        loop_.QueueInLoop([this, attachFd, ctx]() {
-            if (!loop_.AttachConnection(attachFd, ctx)) {
+        EventLoop* targetLoop = &loopGroup_.NextLoop();
+        targetLoop->QueueInLoop([attachFd, ctx, targetLoop]() {
+            if (!targetLoop->AttachConnection(attachFd, ctx)) {
                 ::close(attachFd);
             }
         });

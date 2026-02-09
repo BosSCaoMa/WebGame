@@ -12,6 +12,7 @@ struct NetConfig {
     int maxConnections = 4096;
     int loginThreadPoolSize = 2;
     int heartbeatTimeoutSec = 120;
+    int ioThreadCount = 1;
     bool useEdgeTrigger = true;
     bool enableGuardFilter = true;
 

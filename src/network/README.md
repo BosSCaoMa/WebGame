@@ -4,7 +4,7 @@
 
 | 文件 | 作用 | 关键点 |
 | --- | --- | --- |
-| `NetConfig.h/.cpp` | 定义并加载网络层的运行参数（监听地址、端口、边缘触发开关、最大连接数、登录线程池大小、心跳超时等）。 | `NetConfig::LoadDefault()` 提供默认值，后续可扩展为读取配置文件/环境变量。所有核心对象通过引用同一份配置来保持一致。 |
+| `NetConfig.h/.cpp` | 定义并加载网络层的运行参数（监听地址、端口、边缘触发开关、最大连接数、登录线程池大小、心跳超时、IO 线程数等）。 | `NetConfig::LoadDefault()` 提供默认值，后续可扩展为读取配置文件/环境变量。所有核心对象通过引用同一份配置来保持一致。 |
 | `ClientContext.h` | 描述单个客户端在服务器侧的状态（账号、token、远端地址、状态机、心跳时间戳以及自定义属性表）。 | 提供 `TransitTo`/`TouchHeartbeat` 等接口，保证 EventLoop 与业务线程都能察看一致的会话元数据。 |
 | `MessageCodec.h/.cpp` | 简单的文本协议编解码器，用 `CMD payload\n` 形式表示一条消息，负责拆包、去空白以及编码响应。 | EventLoop 的 `TcpConnection` 在读到数据后交给 `MessageCodec::Decode` 获得 `Packet` 列表，写回时调用 `Encode`。 |
 | `ProtocolDispatcher.h/.cpp` | 将 `Packet.command` 映射到具体处理器。 | 内部用互斥保护 `handlers_` 表，可注册 `PING`/`ECHO` 等命令，未知命令会返回 `ERR unknown command` 并写日志。 |
@@ -12,6 +12,7 @@
 | `HeartbeatManager.h` | 包装心跳超时配置并提供扫描入口。 | EventLoop 在 `ScanHeartbeats` 中使用它驱动心跳检查/踢线逻辑。 |
 | `TcpConnection.h/.cpp` | 抽象单个 TCP 连接，封装 epoll 事件处理、读写缓冲、消息解码、发送队列、关闭流程以及连接诊断。 | 当 `OnEvent` 收到 `EPOLLIN`/`EPOLLOUT` 时分别触发 `HandleReadable`/`HandleWritable`；发送方如果不在 Loop 线程，会通过 `EventLoop::RunInLoop` 保证线程安全。 |
 | `EventLoop.h/.cpp` | 事件驱动内核：维护 epoll、eventfd 唤醒、任务队列、连接表以及心跳扫描。 | `RunInLoop`/`QueueInLoop` 对外暴露跨线程投递；`AttachConnection` 将新 fd 注册到 epoll；`Loop()` 中统一调度 IO、定时任务和挂起 Functor。 |
+| `EventLoopGroup.h/.cpp` | 管理多个 EventLoop 实例，按 `ioThreadCount` 启动线程池并提供 round-robin 的 `NextLoop()`。 | 供 `LoginAcceptor` 在认证成功后挑选目标 Loop，实现连接在多个 IO 线程之间的均衡分配，支持热停/重启。 |
 | `LoginAcceptor.h/.cpp` | 独立线程监听登录端口，做 GuardFilter、首包读取/校验以及 ClientContext 构造，成功后把 fd 投递到 EventLoop。 | 首包遵循 `LOGIN <account> <token>` 行协议，可在此接入真正的鉴权逻辑；失败/黑名单会直接关闭连接并统计拒绝次数。 |
 | `NetBootstrap.h/.cpp` | 网络模块的统一入口，串联配置、事件循环、登录接入与内建协议。 | 在 `RegisterBuiltInHandlers()` 中注册基础命令（PING/ECHO/QUIT）；`Start()` 顺序拉起 EventLoop 和 LoginAcceptor，`Stop()` 负责按反向顺序关闭。 |
 | `NetworkModule.h/.cpp` | 为 `main.cpp` 提供 `InitializeNetwork()` / `ShutdownNetwork()` 封装，管理 `NetBootstrap` 的单例生命周期。 | 方便游戏服在不同阶段初始化/销毁网络层，也为未来热重启/重载留出入口。 |

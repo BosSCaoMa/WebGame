@@ -11,11 +11,12 @@
 namespace webgame::net {
 
 class EventLoop;
+class EventLoopGroup;
 class NetDiag;
 
 class LoginAcceptor {
 public:
-    LoginAcceptor(const NetConfig& config, EventLoop& loop, NetDiag& diag);
+    LoginAcceptor(const NetConfig& config, EventLoopGroup& loopGroup, NetDiag& diag);
     ~LoginAcceptor();
 
     bool Start();
@@ -27,7 +28,7 @@ private:
     bool PerformHandshake(int fd, const sockaddr_in& addr, ClientContextPtr& outCtx);
 
     const NetConfig config_;
-    EventLoop& loop_;
+    EventLoopGroup& loopGroup_;
     NetDiag& diag_;
 
     int listenFd_ = -1;

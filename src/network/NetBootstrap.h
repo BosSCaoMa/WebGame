@@ -9,6 +9,7 @@
 namespace webgame::net {
 
 class EventLoop;
+class EventLoopGroup;
 class LoginAcceptor;
 
 class NetBootstrap {
@@ -27,7 +28,7 @@ private:
     NetConfig config_;
     NetDiag diag_;
     ProtocolDispatcher dispatcher_;
-    std::unique_ptr<EventLoop> eventLoop_;
+    std::unique_ptr<EventLoopGroup> loopGroup_;
     std::unique_ptr<LoginAcceptor> acceptor_;
     bool started_ = false;
 };
