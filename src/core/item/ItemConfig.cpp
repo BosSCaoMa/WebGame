@@ -2,7 +2,7 @@
 #include <random>
 #include "LogM.h"
 #include "json.hpp"
-#include <fstream>z
+#include <fstream>
 using json = nlohmann::json;
 
 namespace {
@@ -115,6 +115,11 @@ BattleAttr ParseBattleAttr(const json& node)
 
 } // namespace
 
+void ItemConfig::init()
+{
+    // TODO: load JSON config files; keep no-op for now.
+}
+
 // ==================== 创建装备实例 ====================
 Equipment ItemConfig::createEquipment(int equipId) const
 {
@@ -127,13 +132,6 @@ Equipment ItemConfig::createEquipment(int equipId) const
     Equipment equip(tmpl->id, tmpl->name, tmpl->type, tmpl->quality, tmpl->skillId, tmpl->setId);
     equip.baseAttrs = tmpl->baseAttrs;
     return equip;
-}
-
-void ItemConfig::clear()
-{
-    items_.clear();
-    equipments_.clear();
-    setBonuses_.clear();
 }
 
 bool loadFromJson(const json& root)
@@ -247,6 +245,5 @@ bool ItemConfig::loadFromFile(const std::string& path)
         LOG_ERROR("ItemConfig: 解析 JSON 失败: %s", ex.what());
         return false;
     }
-    clear();
     return loadFromJson(root);
 }
