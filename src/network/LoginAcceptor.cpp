@@ -3,6 +3,7 @@
 #include "EventLoop.h"
 #include "EventLoopGroup.h"
 #include "NetDiag.h"
+#include "AuthService.h"
 
 #include "LogM.h"
 
@@ -15,19 +16,6 @@
 #include <cerrno>
 #include <cstring>
 #include <string>
-
-namespace {
-
-std::string Trim(const std::string& input) {
-    auto begin = input.find_first_not_of(" \t\r\n");
-    if (begin == std::string::npos) {
-        return {};
-    }
-    auto end = input.find_last_not_of(" \t\r\n");
-    return input.substr(begin, end - begin + 1);
-}
-
-}
 
 namespace webgame::net {
 
@@ -153,6 +141,9 @@ struct RcvTimeoutGuard {
     bool restore;
     timeval oldTv;
 
+    RcvTimeoutGuard(int fdIn, bool restoreIn, const timeval& old)
+        : fd(fdIn), restore(restoreIn), oldTv(old) {}
+
     RcvTimeoutGuard(const RcvTimeoutGuard&) = delete;
     RcvTimeoutGuard& operator=(const RcvTimeoutGuard&) = delete;
 
@@ -166,8 +157,7 @@ struct RcvTimeoutGuard {
     }
 };
 
-bool LoginAcceptor::PerformHandshake(int fd, const sockaddr_in& addr, ClientContextPtr& outCtx) {
-    // 1) 保存旧的 RCVTIMEO，并在函数退出时恢复，避免影响后续连接IO（风险C）
+bool LoginAcceptor::ReadHandshakePayload(int fd, std::string& outPayload) {
     timeval oldTv{};
     socklen_t oldLen = sizeof(oldTv);
     bool haveOld = (::getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &oldTv, &oldLen) == 0);
@@ -181,7 +171,6 @@ bool LoginAcceptor::PerformHandshake(int fd, const sockaddr_in& addr, ClientCont
         return false;
     }
 
-    // 2) 读取首行：最多512字节，遇到'\n'停止
     std::string payload;
     payload.reserve(512);
 
@@ -191,63 +180,32 @@ bool LoginAcceptor::PerformHandshake(int fd, const sockaddr_in& addr, ClientCont
         if (n > 0) {
             size_t oldSize = payload.size();
             payload.append(buffer, static_cast<size_t>(n));
-            // 只在新追加区域附近找 '\n'（可选的小优化）
             if (payload.find('\n', oldSize == 0 ? 0 : oldSize - 1) != std::string::npos) {
                 break;
             }
             continue;
         }
 
-        if (n == 0) { // 对端正常关闭
+        if (n == 0) {
             return false;
         }
 
-        // n < 0: 区分错误原因（风险D）
         if (errno == EINTR) {
-            continue; // 信号打断，重试
+            continue;
         }
-        if (errno == EAGAIN || errno == EWOULDBLOCK) { // 超时
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return false;
         }
-        return false; // 其他错误，直接返回失败
-    }
-
-    auto newline = payload.find('\n');
-    if (newline == std::string::npos) {
         return false;
     }
 
-    std::string line = Trim(payload.substr(0, newline));
-    std::string rest = payload.substr(newline + 1);
-
-    if (line.rfind("LOGIN", 0) != 0) {
+    if (payload.find('\n') == std::string::npos) {
         return false;
     }
 
-    std::string content = Trim(line.substr(5));
-    if (content.empty()) {
-        return false;
-    }
-
-    auto space = content.find(' ');
-    std::string account = Trim(content.substr(0, space));
-    std::string token = (space == std::string::npos) ? std::string{} : Trim(content.substr(space + 1));
-
-    outCtx = std::make_shared<ClientContext>();
-    char ipBuf[INET_ADDRSTRLEN] = {0};
-    ::inet_ntop(AF_INET, &addr.sin_addr, ipBuf, sizeof(ipBuf));
-    outCtx->remoteAddress = ipBuf;
-    outCtx->remotePort = ntohs(addr.sin_port);
-    outCtx->account = account;
-    outCtx->token = token;
-    outCtx->pendingInbound = std::move(rest);
-    outCtx->TransitTo(ClientState::Authed);
-    outCtx->TouchHeartbeat();
-
-    LOG_INFO("Login success account=%s ip=%s", account.c_str(), outCtx->remoteAddress.c_str());
+    outPayload = std::move(payload);
     return true;
 }
-
 
 void LoginAcceptor::EnqueueConnection(int fd, const sockaddr_in& addr) {
     {
@@ -296,6 +254,32 @@ void LoginAcceptor::ProcessTask(int fd, const sockaddr_in& addr) {
             ::close(attachFd);
         }
     });
+}
+
+bool LoginAcceptor::PerformHandshake(int fd, const sockaddr_in& addr, ClientContextPtr& outCtx) {
+    std::string payload;
+    if (!ReadHandshakePayload(fd, payload)) {
+        return false;
+    }
+
+    webgame::auth::LoginPayload loginPayload{};
+    if (!webgame::auth::ValidateLoginPayload(payload, loginPayload)) {
+        return false;
+    }
+
+    outCtx = std::make_shared<ClientContext>();
+    char ipBuf[INET_ADDRSTRLEN] = {0};
+    ::inet_ntop(AF_INET, &addr.sin_addr, ipBuf, sizeof(ipBuf));
+    outCtx->remoteAddress = ipBuf;
+    outCtx->remotePort = ntohs(addr.sin_port);
+    outCtx->account = loginPayload.account;
+    outCtx->token = loginPayload.token;
+    outCtx->pendingInbound = loginPayload.pendingInbound;
+    outCtx->TransitTo(ClientState::Authed);
+    outCtx->TouchHeartbeat();
+
+    LOG_INFO("Login success account=%s ip=%s", loginPayload.account.c_str(), outCtx->remoteAddress.c_str());
+    return true;
 }
 
 } // namespace webgame::net

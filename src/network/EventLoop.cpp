@@ -122,7 +122,7 @@ bool EventLoop::AttachConnection(int fd, ClientContextPtr ctx) {
 
     epoll_event ev{};
     ev.data.ptr = connection.get();
-    ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+    ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR; // 可读 | 读关闭 | 错误
     if (config_.useEdgeTrigger) {
         ev.events |= EPOLLET;
     }
