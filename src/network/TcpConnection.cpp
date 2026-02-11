@@ -61,6 +61,7 @@ void TcpConnection::Send(const std::string& data) {
         return;
     }
     auto self = shared_from_this();
+    // 发送必须在所属 EventLoop 线程执行，RunInLoop 会在必要时切换线程
     loop_.RunInLoop([self, data]() {
         if (self->closing_.load()) {
             return;
@@ -100,6 +101,7 @@ void TcpConnection::HandleReadable() {
     }
 
     std::vector<Packet> packets;
+    // Decode 可能一次吐出多条消息，逐条交给 Dispatcher 处理
     codec_.Decode(inboundBuffer_, packets);
     for (const auto& pkt : packets) {
         diag_.IncMessagesIn();
@@ -139,11 +141,13 @@ void TcpConnection::FlushOutbound() {
                 outboundQueue_.pop_front();
             } else {
                 front.erase(0, static_cast<size_t>(n));
+                // 仍有残留数据，保持 EPOLLOUT 关注，待写缓冲可用时继续
                 loop_.UpdateConnectionEvents(fd_, this, kBaseEvents | EPOLLOUT);
                 return;
             }
         } else {
             if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                // 写缓冲满，注册写事件，等待 epoll 再次调度
                 loop_.UpdateConnectionEvents(fd_, this, kBaseEvents | EPOLLOUT);
                 return;
             }

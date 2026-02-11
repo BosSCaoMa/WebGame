@@ -37,20 +37,27 @@ EventLoop::~EventLoop() {
     Stop();
 }
 
-bool EventLoop::Start() {
+bool EventLoop::Start()
+{
     if (running_.load()) {
         return true;
     }
-    epollFd_ = ::epoll_create1(EPOLL_CLOEXEC);
+
+    // 创建 epoll 实例
+    epollFd_ = ::epoll_create1(EPOLL_CLOEXEC); // EPOLL_CLOEXEC：在 exec 系列函数调用时自动关闭 fd，防止 fd 泄漏
     if (epollFd_ < 0) {
         LOG_ERROR("Failed to create epoll: %s", strerror(errno));
         return false;
     }
-    wakeupFd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+
+    // 创建 eventfd，用于跨线程唤醒 EventLoop。初始值为 0
+    wakeupFd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);  // 非阻塞模式 | exec 时自动关闭
     if (wakeupFd_ < 0) {
         LOG_ERROR("Failed to create eventfd: %s", strerror(errno));
         return false;
     }
+
+    // 注册 wakeupFd_ 到 epoll，用于唤醒阻塞在 epoll_wait 的线程
     epoll_event ev{};
     ev.events = EPOLLIN;
     ev.data.ptr = nullptr;
@@ -66,13 +73,15 @@ bool EventLoop::Start() {
     return true;
 }
 
+// stop不能在 loopThread_ 内部被调用，否则会导致死锁（Stop 等待 loopThread_ 退出，但 loopThread_ 可能正在等待 Stop 释放资源）。
+// 因此，Stop 只能由外部线程调用，且必须保证不在 loopThread_ 内部调用。
 void EventLoop::Stop() {
     if (!running_.exchange(false)) {
         return;
     }
     Wakeup();
     if (loopThread_.joinable()) {
-        loopThread_.join();
+        loopThread_.join(); // 如果不 join，就立刻 close fd：loop 线程可能仍在 epoll_wait 或处理事件,把 epollFd_ / wakeupFd_ close 掉.oop 线程接下来用这些 fd → 轻则报错，重则崩溃
     }
     if (wakeupFd_ >= 0) {
         ::close(wakeupFd_);
@@ -171,6 +180,7 @@ void EventLoop::Loop() {
         for (int i = 0; i < n; ++i) {
             void* ptr = events[i].data.ptr;
             if (ptr == nullptr) {
+                // eventfd 唤醒，只需清理计数便可继续执行挂起任务
                 HandleWakeup();
                 continue;
             }
@@ -193,7 +203,7 @@ void EventLoop::Wakeup() {
 
 void EventLoop::HandleWakeup() {
     uint64_t one = 0;
-    ::read(wakeupFd_, &one, sizeof(one));
+    ::read(wakeupFd_, &one, sizeof(one)); // 读取并清零 eventfd 的计数，准备下一次唤醒，
 }
 
 void EventLoop::ProcessPendingTasks() {
