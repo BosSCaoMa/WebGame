@@ -2,6 +2,7 @@
 
 #include "NetDiag.h"
 #include "ProtocolDispatcher.h"
+#include "SessionManager.h"
 #include "TcpConnection.h"
 
 #include "LogM.h"
@@ -118,12 +119,13 @@ bool EventLoop::AttachConnection(int fd, ClientContextPtr ctx) {
         return false;
     }
 
+    std::string account = ctx ? ctx->account : std::string{};
     auto connection = std::make_shared<TcpConnection>(*this, fd, std::move(ctx), dispatcher_, config_, diag_);
 
     epoll_event ev{};
     ev.data.ptr = connection.get();
     ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR; // 可读 | 读关闭 | 错误
-    if (config_.useEdgeTrigger) {
+    if (config_.useEdgeTrigger) { // 如果使用边缘触发模式，注册 EPOLLET
         ev.events |= EPOLLET;
     }
 
@@ -134,7 +136,11 @@ bool EventLoop::AttachConnection(int fd, ClientContextPtr ctx) {
 
     {
         std::lock_guard<std::mutex> lock(connectionsMutex_);
-        connections_[fd] = std::move(connection);
+        connections_[fd] = connection;
+    }
+
+    if (!account.empty()) {
+        SessionManager::Instance().Register(account, connection);
     }
 
     return true;

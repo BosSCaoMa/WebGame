@@ -4,6 +4,7 @@
 #include "NetConfig.h"
 #include "NetDiag.h"
 #include "ProtocolDispatcher.h"
+#include "SessionManager.h"
 
 #include "LogM.h"
 
@@ -118,10 +119,14 @@ void TcpConnection::HandlePeerClosed() {
     if (closing_.exchange(true)) {
         return;
     }
+    int fd = fd_;
     loop_.DetachConnection(fd_);
     if (fd_ >= 0) {
         ::close(fd_);
         fd_ = -1;
+    }
+    if (!ctx_->account.empty()) {
+        SessionManager::Instance().Unregister(ctx_->account, fd);
     }
     ctx_->TransitTo(ClientState::Closing);
 }
