@@ -1,8 +1,10 @@
 #include "NetBootstrap.h"
 
+#include "AuthService.h"
 #include "EventLoop.h"
 #include "EventLoopGroup.h"
 #include "LoginAcceptor.h"
+#include "SessionManager.h"
 #include "TcpConnection.h"
 
 #include "LogM.h"
@@ -60,18 +62,50 @@ void NetBootstrap::Stop() {
 }
 
 void NetBootstrap::RegisterBuiltInHandlers() {
-    // todo: 目前内置了几个简单的测试命令，后续会替换成真正的业务协议处理器
-    dispatcher_.Register("PING", [](const Packet&, TcpConnection& conn) {
-        conn.Send(MessageCodec::Encode("PONG", {}));
+    dispatcher_.Register("GET", "/ping", [](const HttpRequest&, TcpConnection& conn) {
+        HttpResponse resp;
+        resp.SetHeader("Content-Type", "application/json");
+        resp.body = "{\"status\":\"pong\"}";
+        conn.SendHttpResponse(resp);
     });
 
-    dispatcher_.Register("ECHO", [](const Packet& pkt, TcpConnection& conn) {
-        conn.Send(MessageCodec::Encode("ECHO", pkt.payload));
+    dispatcher_.Register("POST", "/echo", [](const HttpRequest& req, TcpConnection& conn) {
+        HttpResponse resp;
+        resp.SetHeader("Content-Type", "text/plain; charset=utf-8");
+        resp.body = req.body;
+        conn.SendHttpResponse(resp);
     });
 
-    dispatcher_.Register("QUIT", [](const Packet&, TcpConnection& conn) {
-        conn.Send(MessageCodec::Encode("BYE", {}));
-        conn.Close();
+    dispatcher_.Register("POST", "/login", [](const HttpRequest& req, TcpConnection& conn) {
+        HttpResponse resp;
+        resp.SetHeader("Content-Type", "application/json");
+        auto account = req.Header("x-account");
+        auto token = req.Header("x-token");
+
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            conn.SendHttpResponse(resp);
+            return;
+        }
+
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            conn.SendHttpResponse(resp);
+            return;
+        }
+
+        auto ctx = conn.Context();
+        ctx->account = account;
+        ctx->TransitTo(ClientState::Authed);
+        ctx->TouchHeartbeat();
+        SessionManager::Instance().Register(account, conn.shared_from_this());
+
+        resp.body = "{\"status\":\"ok\"}";
+        conn.SendHttpResponse(resp);
     });
 }
 

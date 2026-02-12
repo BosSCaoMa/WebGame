@@ -75,6 +75,10 @@ void TcpConnection::Send(const std::string& data) {
     });
 }
 
+void TcpConnection::SendHttpResponse(const HttpResponse& response) {
+    Send(response.Serialize());
+}
+
 void TcpConnection::Close() {
     auto self = shared_from_this();
     loop_.RunInLoop([self]() { self->HandlePeerClosed(); });
@@ -101,13 +105,26 @@ void TcpConnection::HandleReadable() {
         }
     }
 
-    std::vector<Packet> packets;
-    // Decode 可能一次吐出多条消息，逐条交给 Dispatcher 处理
-    codec_.Decode(inboundBuffer_, packets);
-    for (const auto& pkt : packets) {
-        diag_.IncMessagesIn();
-        dispatcher_.Dispatch(pkt, *this);
-        lastActivity_ = std::chrono::steady_clock::now();
+    try {
+        while (true) {
+            HttpRequest request;
+            if (!codec_.Decode(inboundBuffer_, request)) {
+                break;
+            }
+            diag_.IncMessagesIn();
+            dispatcher_.Dispatch(request, *this);
+            lastActivity_ = std::chrono::steady_clock::now();
+        }
+    } catch (const HttpParseError& ex) {
+        LOG_WARN("HTTP parse failed fd=%d err=%s", fd_, ex.what());
+        HttpResponse resp;
+        resp.statusCode = 400;
+        resp.reason = "Bad Request";
+        resp.body = "Bad Request\n";
+        resp.SetHeader("Content-Type", "text/plain; charset=utf-8");
+        auto serialized = resp.Serialize();
+        ::send(fd_, serialized.data(), serialized.size(), 0);
+        HandlePeerClosed();
     }
 }
 

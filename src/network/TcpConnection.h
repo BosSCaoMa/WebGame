@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ClientContext.h"
-#include "MessageCodec.h"
+#include "HttpCodec.h"
 
 #include <atomic>
 #include <deque>
@@ -32,6 +32,7 @@ public:
 
     void OnEvent(uint32_t events);
     void Send(const std::string& data);
+    void SendHttpResponse(const HttpResponse& response);
     void Close();
     std::chrono::steady_clock::time_point LastActivity() const { return lastActivity_; }
 
@@ -52,7 +53,7 @@ private:
     std::string inboundBuffer_;
     std::deque<std::string> outboundQueue_;
     std::mutex outboundMutex_;
-    MessageCodec codec_;
+    HttpCodec codec_;
     std::atomic<bool> closing_{false};
     std::chrono::steady_clock::time_point lastActivity_ = std::chrono::steady_clock::now();
 };

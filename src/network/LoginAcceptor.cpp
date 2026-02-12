@@ -3,7 +3,6 @@
 #include "EventLoop.h"
 #include "EventLoopGroup.h"
 #include "NetDiag.h"
-#include "AuthService.h"
 
 #include "LogM.h"
 
@@ -136,77 +135,6 @@ bool LoginAcceptor::GuardFilter(const sockaddr_in& addr) const {
     }
     return true;
 }
-struct RcvTimeoutGuard {
-    int fd;
-    bool restore;
-    timeval oldTv;
-
-    RcvTimeoutGuard(int fdIn, bool restoreIn, const timeval& old)
-        : fd(fdIn), restore(restoreIn), oldTv(old) {}
-
-    RcvTimeoutGuard(const RcvTimeoutGuard&) = delete;
-    RcvTimeoutGuard& operator=(const RcvTimeoutGuard&) = delete;
-
-    ~RcvTimeoutGuard() {
-        if (restore) {
-            ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &oldTv, sizeof(oldTv));
-        } else {
-            timeval zero{};
-            ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &zero, sizeof(zero));
-        }
-    }
-};
-
-bool LoginAcceptor::ReadHandshakePayload(int fd, std::string& outPayload) {
-    timeval oldTv{};
-    socklen_t oldLen = sizeof(oldTv);
-    bool haveOld = (::getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &oldTv, &oldLen) == 0);
-
-    RcvTimeoutGuard guard{fd, haveOld, oldTv};
-
-    timeval tv{};
-    tv.tv_sec = 2;
-    tv.tv_usec = 0;
-    if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0) {
-        return false;
-    }
-
-    std::string payload;
-    payload.reserve(512);
-
-    char buffer[256];
-    while (payload.size() < 512) {
-        ssize_t n = ::recv(fd, buffer, sizeof(buffer), 0);
-        if (n > 0) {
-            size_t oldSize = payload.size();
-            payload.append(buffer, static_cast<size_t>(n));
-            if (payload.find('\n', oldSize == 0 ? 0 : oldSize - 1) != std::string::npos) {
-                break;
-            }
-            continue;
-        }
-
-        if (n == 0) {
-            return false;
-        }
-
-        if (errno == EINTR) {
-            continue;
-        }
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return false;
-        }
-        return false;
-    }
-
-    if (payload.find('\n') == std::string::npos) {
-        return false;
-    }
-
-    outPayload = std::move(payload);
-    return true;
-}
-
 void LoginAcceptor::EnqueueConnection(int fd, const sockaddr_in& addr) {
     {
         std::lock_guard<std::mutex> lock(queueMutex_);
@@ -241,7 +169,7 @@ void LoginAcceptor::WorkerLoop() {
 
 void LoginAcceptor::ProcessTask(int fd, const sockaddr_in& addr) {
     ClientContextPtr ctx;
-    if (!PerformHandshake(fd, addr, ctx)) {
+    if (!PerformHandshake(addr, ctx)) {
         diag_.IncRejected();
         ::close(fd);
         return;
@@ -256,29 +184,13 @@ void LoginAcceptor::ProcessTask(int fd, const sockaddr_in& addr) {
     });
 }
 
-bool LoginAcceptor::PerformHandshake(int fd, const sockaddr_in& addr, ClientContextPtr& outCtx) {
-    std::string payload;
-    if (!ReadHandshakePayload(fd, payload)) {
-        return false;
-    }
-
-    webgame::auth::LoginPayload loginPayload{};
-    if (!webgame::auth::ValidateLoginPayload(payload, loginPayload)) {
-        return false;
-    }
-
+bool LoginAcceptor::PerformHandshake(const sockaddr_in& addr, ClientContextPtr& outCtx) {
     outCtx = std::make_shared<ClientContext>();
     char ipBuf[INET_ADDRSTRLEN] = {0};
     ::inet_ntop(AF_INET, &addr.sin_addr, ipBuf, sizeof(ipBuf));
     outCtx->remoteAddress = ipBuf;
     outCtx->remotePort = ntohs(addr.sin_port);
-    outCtx->account = loginPayload.account;
-    outCtx->token = loginPayload.token;
-    outCtx->pendingInbound = loginPayload.pendingInbound;
-    outCtx->TransitTo(ClientState::Authed);
     outCtx->TouchHeartbeat();
-
-    LOG_INFO("Login success account=%s ip=%s", loginPayload.account.c_str(), outCtx->remoteAddress.c_str());
     return true;
 }
 

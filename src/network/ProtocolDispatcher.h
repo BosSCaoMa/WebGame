@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MessageCodec.h"
+#include "HttpCodec.h"
 
 #include <functional>
 #include <mutex>
@@ -13,10 +13,10 @@ class TcpConnection;
 
 class ProtocolDispatcher {
 public:
-    using Handler = std::function<void(const Packet&, TcpConnection&)>;
+    using Handler = std::function<void(const HttpRequest&, TcpConnection&)>;
 
-    void Register(const std::string& command, Handler handler);
-    void Dispatch(const Packet& packet, TcpConnection& connection);
+    void Register(const std::string& method, const std::string& path, Handler handler);
+    void Dispatch(const HttpRequest& request, TcpConnection& connection);
 
 private:
     std::mutex mutex_;

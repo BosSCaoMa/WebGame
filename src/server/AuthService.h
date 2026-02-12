@@ -4,12 +4,6 @@
 
 namespace webgame::auth {
 
-struct LoginPayload {
-	std::string account;
-	std::string token;
-	std::string pendingInbound;
-};
-
-bool ValidateLoginPayload(const std::string& payload, LoginPayload& outPayload);
+bool ValidateCredential(const std::string& account, const std::string& token);
 
 } // namespace webgame::auth

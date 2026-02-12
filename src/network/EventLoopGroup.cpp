@@ -55,6 +55,7 @@ void EventLoopGroup::Stop() {
 }
 
 EventLoop& EventLoopGroup::NextLoop() {
+    // todo 设置负载均衡算法
     if (loops_.empty()) {
         throw std::runtime_error("EventLoopGroup has no loops");
     }

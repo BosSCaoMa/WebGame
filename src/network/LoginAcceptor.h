@@ -30,8 +30,7 @@ public:
 private:
     void AcceptLoop();
     bool GuardFilter(const sockaddr_in& addr) const;
-    bool PerformHandshake(int fd, const sockaddr_in& addr, ClientContextPtr& outCtx);
-    bool ReadHandshakePayload(int fd, std::string& outPayload);
+    bool PerformHandshake(const sockaddr_in& addr, ClientContextPtr& outCtx);
     void EnqueueConnection(int fd, const sockaddr_in& addr);
     void WorkerLoop();
     void ProcessTask(int fd, const sockaddr_in& addr);
