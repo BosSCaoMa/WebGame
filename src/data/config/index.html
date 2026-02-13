@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGame 配置编辑器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="canvas">
+        <header class="hero">
+            <div>
+                <p class="eyebrow">WebGame 数据工具</p>
+                <h1>技能 / 武将 / 装备 配置编辑器</h1>
+                <p class="lede">导入 JSON 配置，按需新增或修改，实时预览结构，最后一键导出，直接用于游戏数据。</p>
+                <div class="hero-actions">
+                    <button id="triggerImport" class="primary">导入 JSON</button>
+                    <button id="exportJson" class="ghost">导出当前配置</button>
+                    <input type="file" id="importFile" accept="application/json" hidden>
+                </div>
+                <p id="statusText" class="status-text">尚未导入，正在使用空白模板。</p>
+            </div>
+            <div class="hero-panel">
+                <p class="hero-panel-title">当前数据统计</p>
+                <ul>
+                    <li><span>技能</span><strong id="skillCount">0</strong></li>
+                    <li><span>武将</span><strong id="characterCount">0</strong></li>
+                    <li><span>装备</span><strong id="equipCount">0</strong></li>
+                    <li><span>套装</span><strong id="setBonusCount">0</strong></li>
+                    <li><span>物品</span><strong id="itemCount">0</strong></li>
+                </ul>
+            </div>
+        </header>
+
+        <nav class="tabs" role="tablist">
+            <button class="tab active" data-tab="skills">技能</button>
+            <button class="tab" data-tab="characters">武将</button>
+            <button class="tab" data-tab="equipments">装备</button>
+            <button class="tab" data-tab="setBonuses">套装</button>
+            <button class="tab" data-tab="items">物品</button>
+        </nav>
+
+        <section class="panel active" data-panel="skills">
+            <div class="split">
+                <div class="list-pane with-presets">
+                    <div class="list-pane-body">
+                        <aside class="preset-rail" data-preset="skills">
+                            <div class="preset-rail-header">
+                                <p class="eyebrow mini">快捷模板</p>
+                                <h3>技能示例</h3>
+                                <p class="helper-text">常用技能骨架，基于不同触发与战斗目标，一键插入即可微调。</p>
+                            </div>
+                            <div class="preset-card-column" id="skillPresetList"></div>
+                        </aside>
+                        <div class="list-content">
+                            <div class="list-pane-header">
+                                <div>
+                                    <h2>技能列表</h2>
+                                    <p class="list-count" data-count="skills">共 0 条</p>
+                                </div>
+                                <button class="primary" data-add="skills">+ 新建技能</button>
+                            </div>
+                            <div class="list-tools">
+                                <input type="search" placeholder="搜索技能（ID / 名称 / 触发）" data-filter="skills">
+                            </div>
+                            <div class="card-list" id="skillsList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-pane">
+                    <form id="skillForm" class="editor-form">
+                        <div class="form-header">
+                            <h3>技能模板</h3>
+                            <div class="form-actions">
+                                <button type="button" class="ghost" data-delete="skills">删除</button>
+                            </div>
+                        </div>
+                        <div class="field-grid two">
+                            <label>技能 ID
+                                <input type="number" min="0" data-path="id" data-type="number" required>
+                            </label>
+                            <label>触发方式
+                                <select data-path="trigger" data-enum="skillTriggers"></select>
+                            </label>
+                        </div>
+                        <label>名称
+                            <input type="text" data-path="name" placeholder="输入技能名称" required>
+                        </label>
+                        <label>描述
+                            <textarea data-path="description" rows="2" placeholder="用于说明技能效果"></textarea>
+                        </label>
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>技能效果</h4>
+                                <button type="button" class="ghost" id="addEffect">+ 效果</button>
+                            </div>
+                            <div id="effectRepeater" class="effect-grid"></div>
+                        </section>
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <div>
+                                    <h4>关联武将</h4>
+                                    <p class="helper-text">在此直接把技能同步到武将，无需切换页面。</p>
+                                </div>
+                                <div class="link-control">
+                                    <select id="skillCharacterSelect" aria-label="选择需要关联的武将"></select>
+                                    <button type="button" class="ghost" id="linkCharacterBtn">+ 添加</button>
+                                </div>
+                            </div>
+                            <div id="skillCharacterLinks" class="chip-list" aria-live="polite"></div>
+                        </section>
+                    </form>
+                    <p class="placeholder" id="skillPlaceholder">请选择左侧技能或新建一个。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" data-panel="characters">
+            <div class="split">
+                <div class="list-pane with-presets">
+                    <div class="list-pane-body">
+                        <aside class="preset-rail" data-preset="characters">
+                            <div class="preset-rail-header">
+                                <p class="eyebrow mini">快捷模板</p>
+                                <h3>武将示例</h3>
+                                <p class="helper-text">涵盖五大职业定位，快速搭建职业骨架。</p>
+                            </div>
+                            <div class="preset-card-column" id="characterPresetList"></div>
+                        </aside>
+                        <div class="list-content">
+                            <div class="list-pane-header">
+                                <div>
+                                    <h2>武将列表</h2>
+                                    <p class="list-count" data-count="characters">共 0 条</p>
+                                </div>
+                                <button class="primary" data-add="characters">+ 新建武将</button>
+                            </div>
+                            <div class="list-tools">
+                                <input type="search" placeholder="搜索武将（ID / 名称 / 品阶）" data-filter="characters">
+                            </div>
+                            <div class="card-list" id="charactersList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-pane">
+                    <form id="characterForm" class="editor-form">
+                        <div class="form-header">
+                            <h3>武将模板</h3>
+                            <div class="form-actions">
+                                <button type="button" class="ghost" data-delete="characters">删除</button>
+                            </div>
+                        </div>
+                        <div class="field-grid two">
+                            <label>武将 ID
+                                <input type="number" min="0" data-path="id" data-type="number" required>
+                            </label>
+                            <label>品阶
+                                <select data-path="quality" data-enum="qualityTypes"></select>
+                            </label>
+                        </div>
+                        <div class="field-grid two">
+                            <label>名称
+                                <input type="text" data-path="name" placeholder="角色名称" required>
+                            </label>
+                            <label>定位
+                                <select data-path="position" data-enum="positions"></select>
+                            </label>
+                        </div>
+                        <label>基础名（可选）
+                            <input type="text" data-path="baseName" placeholder="用于自定义成长线">
+                        </label>
+                        <label>关联角色 ID（合击）
+                            <input type="number" data-path="relId" data-type="number" min="0">
+                        </label>
+                        <input type="hidden" data-path="skillIds" data-type="int-array">
+                        <section class="subsection attached">
+                            <div class="subsection-header">
+                                <div>
+                                    <h4>技能列表</h4>
+                                    <p class="helper-text">快速搜索并添加技能，可拖动顺序后续再实现。</p>
+                                </div>
+                                <div class="link-control">
+                                    <select id="characterSkillSelect" aria-label="选择需要添加的技能"></select>
+                                    <button type="button" class="ghost" id="addCharacterSkill">+ 添加</button>
+                                </div>
+                            </div>
+                            <div id="characterSkillChips" class="chip-list" aria-live="polite"></div>
+                        </section>
+                    </form>
+                    <p class="placeholder" id="characterPlaceholder">请选择左侧武将或新建一个。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" data-panel="equipments">
+            <div class="split">
+                <div class="list-pane with-presets">
+                    <div class="list-pane-body">
+                        <aside class="preset-rail" data-preset="equipments">
+                            <div class="preset-rail-header">
+                                <p class="eyebrow mini">快捷模板</p>
+                                <h3>装备示例</h3>
+                                <p class="helper-text">按装备类型列出基础属性模板，方便套用。</p>
+                            </div>
+                            <div class="preset-card-column" id="equipmentPresetList"></div>
+                        </aside>
+                        <div class="list-content">
+                            <div class="list-pane-header">
+                                <div>
+                                    <h2>装备列表</h2>
+                                    <p class="list-count" data-count="equipments">共 0 条</p>
+                                </div>
+                                <button class="primary" data-add="equipments">+ 新建装备</button>
+                            </div>
+                            <div class="list-tools">
+                                <input type="search" placeholder="搜索装备（ID / 名称 / 类型）" data-filter="equipments">
+                            </div>
+                            <div class="card-list" id="equipmentsList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-pane">
+                    <form id="equipmentForm" class="editor-form">
+                        <div class="form-header">
+                            <h3>装备模板</h3>
+                            <div class="form-actions">
+                                <button type="button" class="ghost" data-delete="equipments">删除</button>
+                            </div>
+                        </div>
+                        <div class="field-grid two">
+                            <label>装备 ID
+                                <input type="number" min="0" data-path="id" data-type="number" required>
+                            </label>
+                            <label>装备类型
+                                <select data-path="type" data-enum="equipmentTypes"></select>
+                            </label>
+                        </div>
+                        <div class="field-grid two">
+                            <label>名称
+                                <input type="text" data-path="name" placeholder="装备名称" required>
+                            </label>
+                            <label>品质
+                                <select data-path="quality" data-enum="qualityTypes"></select>
+                            </label>
+                        </div>
+                        <div class="field-grid two">
+                            <label>技能 ID
+                                <input type="number" min="0" data-path="skillId" data-type="number">
+                            </label>
+                            <label>套装 ID
+                                <input type="number" min="0" data-path="setId" data-type="number">
+                            </label>
+                        </div>
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>基础属性</h4>
+                            </div>
+                            <div class="field-grid two">
+                                <label>生命值（当前）
+                                    <input type="number" data-path="baseAttrs.hp" data-type="number" step="1">
+                                </label>
+                                <label>最大生命值
+                                    <input type="number" data-path="baseAttrs.maxHp" data-type="number" step="1">
+                                </label>
+                                <label>攻击
+                                    <input type="number" data-path="baseAttrs.atk" data-type="number" step="1">
+                                </label>
+                                <label>防御
+                                    <input type="number" data-path="baseAttrs.def" data-type="number" step="1">
+                                </label>
+                                <label>速度
+                                    <input type="number" data-path="baseAttrs.speed" data-type="number" step="1">
+                                </label>
+                                <label>暴击率
+                                    <input type="number" data-path="baseAttrs.critRate" data-type="number" step="1">
+                                </label>
+                                <label>暴击伤害
+                                    <input type="number" data-path="baseAttrs.critDamage" data-type="number" step="1">
+                                </label>
+                                <label>命中率
+                                    <input type="number" data-path="baseAttrs.hitRate" data-type="number" step="1">
+                                </label>
+                                <label>闪避率
+                                    <input type="number" data-path="baseAttrs.dodgeRate" data-type="number" step="1">
+                                </label>
+                            </div>
+                        </section>
+                    </form>
+                    <p class="placeholder" id="equipmentPlaceholder">请选择左侧装备或新建一个。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" data-panel="setBonuses">
+            <div class="split">
+                <div class="list-pane with-presets">
+                    <div class="list-pane-body">
+                        <aside class="preset-rail" data-preset="setBonuses">
+                            <div class="preset-rail-header">
+                                <p class="eyebrow mini">快捷模板</p>
+                                <h3>套装示例</h3>
+                                <p class="helper-text">按 2/4 件套划分，附带属性与技能示例。</p>
+                            </div>
+                            <div class="preset-card-column" id="setBonusPresetList"></div>
+                        </aside>
+                        <div class="list-content">
+                            <div class="list-pane-header">
+                                <div>
+                                    <h2>套装列表</h2>
+                                    <p class="list-count" data-count="setBonuses">共 0 条</p>
+                                </div>
+                                <button class="primary" data-add="setBonuses">+ 新建套装</button>
+                            </div>
+                            <div class="list-tools">
+                                <input type="search" placeholder="搜索套装（ID / 名称 / 件数）" data-filter="setBonuses">
+                            </div>
+                            <div class="card-list" id="setBonusList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-pane">
+                    <form id="setBonusForm" class="editor-form">
+                        <div class="form-header">
+                            <h3>套装模板</h3>
+                            <div class="form-actions">
+                                <button type="button" class="ghost" data-delete="setBonuses">删除</button>
+                            </div>
+                        </div>
+                        <div class="field-grid two">
+                            <label>套装 ID
+                                <input type="number" min="0" data-path="setId" data-type="number" required>
+                            </label>
+                            <label>套装名称
+                                <input type="text" data-path="name" placeholder="套装名称" required>
+                            </label>
+                        </div>
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>套装效果</h4>
+                                <button type="button" class="ghost" id="addSetBonusPiece">+ 套装效果</button>
+                            </div>
+                            <div id="setBonusPieceRepeater" class="effect-grid"></div>
+                        </section>
+                    </form>
+                    <p class="placeholder" id="setBonusPlaceholder">请选择左侧套装或新建一个。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" data-panel="items">
+            <div class="split">
+                <div class="list-pane with-presets">
+                    <div class="list-pane-body">
+                        <aside class="preset-rail" data-preset="items">
+                            <div class="preset-rail-header">
+                                <p class="eyebrow mini">快捷模板</p>
+                                <h3>物品示例</h3>
+                                <p class="helper-text">按物品类型准备的常见消耗/材料模板。</p>
+                            </div>
+                            <div class="preset-card-column" id="itemPresetList"></div>
+                        </aside>
+                        <div class="list-content">
+                            <div class="list-pane-header">
+                                <div>
+                                    <h2>物品列表</h2>
+                                    <p class="list-count" data-count="items">共 0 条</p>
+                                </div>
+                                <button class="primary" data-add="items">+ 新建物品</button>
+                            </div>
+                            <div class="list-tools">
+                                <input type="search" placeholder="搜索物品（ID / 名称 / 类型）" data-filter="items">
+                            </div>
+                            <div class="card-list" id="itemsList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-pane">
+                    <form id="itemForm" class="editor-form">
+                        <div class="form-header">
+                            <h3>物品模板</h3>
+                            <div class="form-actions">
+                                <button type="button" class="ghost" data-delete="items">删除</button>
+                            </div>
+                        </div>
+                        <div class="field-grid two">
+                            <label>物品 ID
+                                <input type="number" min="0" data-path="id" data-type="number" required>
+                            </label>
+                            <label>物品类型
+                                <select data-path="type" data-enum="itemTypes"></select>
+                            </label>
+                        </div>
+                        <div class="field-grid two">
+                            <label>子类型 / 分类
+                                <select data-path="subType" data-enum="consumableTypes"></select>
+                            </label>
+                            <label>品质
+                                <select data-path="quality" data-enum="qualityTypes"></select>
+                            </label>
+                        </div>
+                        <div class="field-grid two">
+                            <label>最大堆叠
+                                <input type="number" data-path="maxStack" data-type="number" min="1">
+                            </label>
+                            <label>标签（逗号分隔）
+                                <input type="text" data-path="tags" placeholder="如：治疗,战斗">
+                            </label>
+                        </div>
+                        <label>描述
+                            <textarea data-path="description" rows="2" placeholder="物品用途描述"></textarea>
+                        </label>
+
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>堆叠与绑定规则</h4>
+                            </div>
+                            <div class="field-grid three">
+                                <label>堆叠上限
+                                    <input type="number" data-path="stack.max" data-type="number" min="1">
+                                </label>
+                                <label>唯一物品
+                                    <input type="checkbox" data-path="stack.unique" data-type="boolean">
+                                </label>
+                                <label>自动拆分
+                                    <input type="checkbox" data-path="stack.autoSplit" data-type="boolean">
+                                </label>
+                            </div>
+                            <div class="field-grid three">
+                                <label>可交易
+                                    <input type="checkbox" data-path="ownership.tradable" data-type="boolean">
+                                </label>
+                                <label>拾取即绑定
+                                    <input type="checkbox" data-path="ownership.bindOnPickup" data-type="boolean">
+                                </label>
+                                <label>装备即绑定
+                                    <input type="checkbox" data-path="ownership.bindOnEquip" data-type="boolean">
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>消耗品配置</h4>
+                                <button type="button" class="ghost" id="addItemEffect">+ 效果</button>
+                            </div>
+                            <div class="field-grid three">
+                                <label>类别
+                                    <select data-path="consumable.category" data-enum="consumableTypes"></select>
+                                </label>
+                                <label>冷却（秒）
+                                    <input type="number" data-path="consumable.cooldownSec" data-type="number" min="0">
+                                </label>
+                                <label>使用后摧毁
+                                    <input type="checkbox" data-path="consumable.destroyOnUse" data-type="boolean">
+                                </label>
+                            </div>
+                            <div id="itemEffectRepeater" class="effect-grid"></div>
+                        </section>
+
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>材料配置</h4>
+                            </div>
+                            <div class="field-grid two">
+                                <label>材料类别
+                                    <select data-path="material.category" data-enum="materialTypes"></select>
+                                </label>
+                                <label>等级/阶数
+                                    <input type="number" data-path="material.tier" data-type="number" min="0">
+                                </label>
+                            </div>
+                            <label>用途描述
+                                <textarea data-path="material.usage" rows="2" placeholder="用于描述合成/任务用途"></textarea>
+                            </label>
+                        </section>
+
+                        <section class="subsection">
+                            <div class="subsection-header">
+                                <h4>货币配置</h4>
+                            </div>
+                            <div class="field-grid three">
+                                <label>货币类别
+                                    <select data-path="currency.category" data-enum="currencyTypes"></select>
+                                </label>
+                                <label>精度（最小单位）
+                                    <input type="number" data-path="currency.precision" data-type="number" min="1">
+                                </label>
+                                <label>跨角色共享
+                                    <input type="checkbox" data-path="currency.sharedAcrossRoles" data-type="boolean">
+                                </label>
+                            </div>
+                            <label>允许负数
+                                <input type="checkbox" data-path="currency.allowNegative" data-type="boolean">
+                            </label>
+                        </section>
+                    </form>
+                    <p class="placeholder" id="itemPlaceholder">请选择左侧物品或新建一个。</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

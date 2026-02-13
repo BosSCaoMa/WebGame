@@ -144,7 +144,7 @@ bool Package::addItem(int itemId, int count)
         if (!tmpl) return false;
         
         // 检查堆叠上限
-        if (slot.count + count <= tmpl->maxStack) {
+        if (slot.count + count <= tmpl->meta.stack.maxStack) {
             slot.count += count;
             return true;
         } else {

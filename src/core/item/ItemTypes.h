@@ -17,6 +17,24 @@ enum class ConsumableType {
     BUFF_POTION,    // 属性药水
 };
 
+// ==================== 材料类型 ====================
+enum class MaterialType {
+    NONE = 0,
+    CRAFT,          // 通用打造材料
+    UPGRADE,        // 升阶/强化材料
+    QUEST,          // 任务道具
+    EVENT           // 活动限定材料
+};
+
+// ==================== 货币类型 ====================
+enum class CurrencyType {
+    UNKNOWN = 0,
+    SOFT,           // 常规金币/铜钱
+    PREMIUM,        // 付费钻石
+    BOUND_PREMIUM,  // 绑定钻石
+    TOKEN           // 活动代币/积分
+};
+
 // ==================== 装备类型 ====================
 enum class EquipmentType {
     WEAPON = 0,     // 武器
