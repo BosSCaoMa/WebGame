@@ -3,6 +3,8 @@
 #include "Skill.h"
 #include <unordered_map>
 #include <functional>
+#include <string>
+#include <json.hpp>
 
 // ==================== 技能配置管理器 ====================
 class SkillConfig {
@@ -32,6 +34,12 @@ public:
     void reg(const Skill& skill) {
         skills_[skill.id] = skill;
     }
+
+    // 读取 JSON 并替换当前技能表
+    bool loadFromJson(const nlohmann::json& root, std::string* err = nullptr);
+    bool loadFromFile(const std::string& path, std::string* err = nullptr);
+
+    void clear() { skills_.clear(); }
 
 private:
     SkillConfig() { /* initSkills(); */ }

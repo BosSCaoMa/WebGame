@@ -9,12 +9,18 @@
 #include <vector>
 #include <initializer_list>
 
+namespace nlohmann {
+class json;
+}
+
 // ==================== 武将模板 ====================
 struct CharacterTemplate {
     int id;
     std::string name;
     QualityType quality; 
     Position position;
+    int relId = 0;
+    std::string baseName;
     // ===== 技能 =====
     std::vector<int> skillIds;      // 技能ID列表
     
@@ -51,6 +57,11 @@ public:
     
     // 获取所有武将ID
     std::vector<int> getAllIds() const;
+
+    bool loadFromJson(const nlohmann::json& root, std::string* err = nullptr);
+    bool loadFromFile(const std::string& path, std::string* err = nullptr);
+
+    void clear() { templates_.clear(); }
 
 private:
     CharacterConfig() { /* initCharacters(); */ }

@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "version": 1,
+    "updatedAt": "2026-02-08T13:20:01.967Z"
+  },
+  "skills": [
+    {
+      "id": 1,
+      "name": "单体攻击",
+      "description": "对一名敌人造成100%攻击力的伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_SINGLE",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "ABSOLUTE",
+            "value": 10000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "单列攻击",
+      "description": "对地方一列敌人造成80%攻击力的伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_COL",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 8000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "前排攻击",
+      "description": "对地方前排造成60%攻击里的伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_FRONT_ROW",
+          "effect": "PIERCE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 6000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "后排攻击",
+      "description": "对地方后排造成50%攻击力的伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_BACK_ROW",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "FIXED",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 5000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "群体攻击",
+      "description": "对敌方全体造成40%攻击力的伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_ALL",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 10000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "单体治疗",
+      "description": "治疗己方血量最低的一人100%攻击力的血量",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ALLY_HP_LOW1",
+          "effect": "HEAL",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 10000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "id": 1,
+      "relId": 0,
+      "name": "步兵",
+      "baseName": "",
+      "quality": "WHITE",
+      "position": "WARRIOR",
+      "skillIds": [
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "relId": 0,
+      "name": "弓箭手",
+      "baseName": "",
+      "quality": "WHITE",
+      "position": "ASSASSIN",
+      "skillIds": [
+        4
+      ]
+    }
+  ],
+  "equipments": []
+}

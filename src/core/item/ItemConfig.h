@@ -3,6 +3,8 @@
 #include "equip.h"
 #include <unordered_map>
 #include <vector>
+#include <string>
+#include <json.hpp>
 
 // ==================== 物品模板 ====================
 struct ItemTemplate {
@@ -95,6 +97,11 @@ private:
     ItemConfig& operator=(const ItemConfig&) = delete;
 
     void init();
+
+public:
+    bool loadFromJson(const nlohmann::json& root, std::string* err = nullptr);
+    bool loadFromFile(const std::string& path, std::string* err = nullptr);
+    void clear();
     // void initConsumables();
     // void initMaterials();
     // void initEquipments();
