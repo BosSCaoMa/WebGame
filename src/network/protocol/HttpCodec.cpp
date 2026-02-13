@@ -74,19 +74,28 @@ std::string HttpResponse::Serialize() const {
     return oss.str();
 }
 
-bool HttpCodec::Decode(std::string& buffer, HttpRequest& outRequest) {
+/*
+        POST /api/v1/resource HTTP/1.1
+        Host: example.com
+        Content-Type: application/json
+        Content-Length: 18
+
+        {"key": "value"}
+*/
+bool HttpCodec::Decode(std::string& buffer, HttpRequest& outRequest)
+{
     size_t headerEnd = FindHeaderEnd(buffer);
     if (headerEnd == std::string::npos) {
         return false;
     }
     const size_t bodyStart = headerEnd + 4;
 
-    std::string headerSection = buffer.substr(0, headerEnd);
+    std::string headerSection = buffer.substr(0, headerEnd); // 请求头部分 ：请求行 + 头部
     size_t lineEnd = headerSection.find("\r\n");
     if (lineEnd == std::string::npos) {
         throw HttpParseError("invalid request line");
     }
-    std::string requestLine = headerSection.substr(0, lineEnd);
+    std::string requestLine = headerSection.substr(0, lineEnd); // 请求行
     std::string_view lineView(requestLine);
 
     size_t firstSpace = lineView.find(' ');
@@ -122,7 +131,8 @@ bool HttpCodec::Decode(std::string& buffer, HttpRequest& outRequest) {
         std::string value = Trim(std::string_view(line).substr(colon + 1));
         outRequest.headers[key] = std::move(value);
     }
-
+    
+    // 解析消息体
     size_t contentLength = 0;
     auto it = outRequest.headers.find("content-length");
     if (it != outRequest.headers.end() && !it->second.empty()) {

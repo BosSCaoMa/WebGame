@@ -215,7 +215,7 @@ bool Character::addExp(int64_t amount) {
 
 bool Character::canLevelUp() const {
     // 等级上限：基础80级 + 突破等级*10, 最大等级120级
-    int maxLevel = 80 + (breakthrough - 1) * 10;
+    int maxLevel = 80 + breakthrough * 10;
     if (maxLevel > 120) {
         maxLevel = 120;
     }

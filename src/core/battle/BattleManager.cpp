@@ -195,6 +195,12 @@ BattleManager::Result BattleManager::executeRound()
 
         triggerSkills(SkillTrigger::TURN_START, actor);
         executeAction(actor);
+        // 把tickBuffs放在行动结束后，避免因为跳过行动而无法触发buff效果，或者buff持续时间不减少
+        if (actor->isAlive) {
+            actor->tickBuffs();
+        } else {
+            log("  → 行动中死亡，跳过 Buff");
+        }    
         triggerSkills(SkillTrigger::TURN_END, actor);
         
         result_ = checkBattleResult();
@@ -413,7 +419,7 @@ void BattleManager::applyEffect(BattleCharacter* caster, BattleCharacter* target
 
         // ===== 护盾 =====
         case EffectType::SHIELD: {
-            const int64_t shield = calculateValue(caster, effect);
+            const int64_t shield = calculateValue(caster, effect, target);
             target->addShield(shield);
             log("  - " + target->name + " 获得护盾 " + to_string(shield)
                 + " (当前护盾: " + to_string(target->shieldValue) + ")");
@@ -884,7 +890,7 @@ vector<BattleCharacter*> BattleManager::selectByAttr(vector<BattleCharacter>& te
 void BattleManager::triggerSkills(SkillTrigger trigger)
 {
     for (BattleCharacter* ch : actionOrder_) {
-        if (!debugging) {
+        if (debugging) {
             waitSeconds(0.5); // 每个人物行动前等待0.5秒，增加节奏感
         }
         triggerSkills(trigger, ch);
@@ -908,7 +914,7 @@ void BattleManager::triggerSkills(SkillTrigger trigger, BattleCharacter* specifi
         if (skill.id == 0) {
             continue;
         }
-        if (!debugging) {
+        if (debugging) {
             waitSeconds(0.3); // 每个技能触发前等待0.3秒，增加节奏感
         }
         log(specificCharacter->name + " 触发技能: " + skill.name);

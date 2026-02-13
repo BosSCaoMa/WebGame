@@ -134,6 +134,7 @@ Equipment ItemConfig::createEquipment(int equipId) const
     return equip;
 }
 
+namespace {
 bool loadFromJson(const json& root)
 {
     const auto itemsIt = root.find("items");
@@ -228,6 +229,7 @@ bool loadFromJson(const json& root)
     }
 
     return true;
+}
 }
 
 bool ItemConfig::loadFromFile(const std::string& path)

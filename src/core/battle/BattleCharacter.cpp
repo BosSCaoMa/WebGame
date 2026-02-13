@@ -11,13 +11,14 @@ BattleCharacter::BattleCharacter(Character* ch, int battleId)
 {
     if (ch == nullptr) {
         LOG_ERROR("BattleCharacter::fromCharacter: null Character pointer");
-    }
-    baseAttr = ch->getTotalAttr();
-    currentAttr = baseAttr;
-    
-    // 复制技能
-    for (const auto& pair : ch->skills) {
-        skills[pair.first] = pair.second;
+    } else {
+        baseAttr = ch->getTotalAttr();
+        currentAttr = baseAttr;
+        
+        // 复制技能
+        for (const auto& pair : ch->skills) {
+            skills[pair.first] = pair.second;
+        }
     }
 }
 
@@ -111,7 +112,7 @@ void BattleCharacter::recalculateAttr()
     int currentRage = currentAttr.rage;
     
     currentAttr = baseAttr;
-    currentAttr.hp = currentHp;
+    currentAttr.hp = std::clamp(currentHp, static_cast<int64_t>(0), currentAttr.maxHp);
     currentAttr.rage = currentRage;
     for (const Buff& buff : buffs) {
         switch (buff.type) {
@@ -184,7 +185,7 @@ bool BattleCharacter::BuffIsOffset(EffectType type) const
             return false;
     }
     // resistValue是百分比，随机生成0-99
-    int roll = rand();
+    int roll = rand() % 100;
     return roll < resistValue;
 }
 

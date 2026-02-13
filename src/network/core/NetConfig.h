@@ -16,7 +16,10 @@ struct NetConfig {
     bool useEdgeTrigger = true; // 是否使用边缘触发模式，默认为 true
     bool enableGuardFilter = true; // 是否启用连接过滤器，默认为 true
 
-    static NetConfig LoadDefault();
+    static NetConfig LoadDefault() {
+        NetConfig cfg;
+        return cfg;
+    };
 };
 
 } // namespace webgame::net

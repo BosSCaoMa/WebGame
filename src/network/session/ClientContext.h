@@ -1,3 +1,11 @@
+/*
+    * ClientContext.h
+    *
+    *  Created on: 2026年2月8日
+    * 
+    * 功能描述: 客户端连接上下文，包含连接状态、账号信息、心跳时间等
+    * 版本: 1.0
+*/
 #pragma once
 
 #include <atomic>
@@ -37,23 +45,8 @@ struct ClientContext {
         return state.load(std::memory_order_relaxed);
     }
 
-    void SetAttribute(const std::string& key, const std::string& value) {
-        std::lock_guard<std::mutex> lock(attrMutex);
-        attributes[key] = value;
-    }
-
-    std::string GetAttribute(const std::string& key) const {
-        std::lock_guard<std::mutex> lock(attrMutex);
-        auto it = attributes.find(key);
-        if (it == attributes.end()) {
-            return {};
-        }
-        return it->second;
-    }
-
 private:
     mutable std::mutex attrMutex;
-    std::unordered_map<std::string, std::string> attributes;
 };
 
 using ClientContextPtr = std::shared_ptr<ClientContext>;
