@@ -2,47 +2,13 @@
 
 #include "BattleTypes.h"
 #include "Character.h"
+#include "Inventory.h"
 #include "equip.h"
+#include "ShopTypes.h"
 #include <string>
 #include <map>
 #include <vector>
 #include <unordered_map>
-
-// ==================== 背包系统 ====================
-struct ItemSlot {
-    int itemId;
-    int count;
-    
-    ItemSlot() : itemId(0), count(0) {}
-    ItemSlot(int id, int cnt) : itemId(id), count(cnt) {}
-};
-
-class Package {
-public:
-    std::unordered_map<int, ItemSlot> itemsMap; // 物品背包 <itemId, ItemSlot>
-    std::vector<Equipment> equipments;  // 装备背包
-    
-    unsigned int maxItemSlots = 100;
-    unsigned int maxEquipSlots = 100;
-    
-    // 添加物品
-    bool addItem(int itemId, int count);
-    
-    // 移除物品
-    bool removeItem(int itemId, int count);
-    
-    // 获取物品数量
-    int getItemCount(int itemId) const;
-    
-    // 添加装备
-    bool addEquipment(const Equipment& equip);
-    
-    // 移除装备
-    bool removeEquipment(int index);
-    
-    // 获取装备
-    const Equipment* getEquipment(int index) const;
-};
 
 // ==================== 玩家类 ====================
 class Player {
@@ -64,7 +30,7 @@ public:
     uint64_t combatPower = 0;                  // 总战力
     
     // ==================== 背包系统 ====================
-    Package package;
+    Inventory inventory;
     
     // ==================== 构造函数 ====================
     Player();
@@ -78,6 +44,9 @@ public:
     void addResource(int resourceId, int64_t amount);
     bool costResource(int resourceId, int64_t amount);
     int64_t getResource(int resourceId) const;
+    void addCurrency(CurrencyType type, int64_t amount);
+    bool costCurrency(CurrencyType type, int64_t amount);
+    int64_t getCurrency(CurrencyType type) const;
     
     // ==================== 武将管理 ====================
     bool addCharacter(const Character& ch);
@@ -99,7 +68,22 @@ public:
     // ==================== 数据持久化 ====================
     bool saveDataToServer();
     bool loadDataFromServer();
+
+    // ==================== 商城交互 ====================
+    int getShopPurchaseCount(int offerId) const;
+    void recordShopPurchase(int offerId, int quantity);
+    bool purchaseFromShop(ShopType type, int offerId, int quantity, std::string* errMsg = nullptr);
     
 private:
     uint64_t calculateCharacterPower(const Character* ch) const;
+
+    struct CurrencyHash {
+        size_t operator()(CurrencyType type) const noexcept
+        {
+            return static_cast<size_t>(type);
+        }
+    };
+
+    std::unordered_map<CurrencyType, int64_t, CurrencyHash> currencyWallet_;
+    std::unordered_map<int, int> shopPurchaseHistory_;
 };

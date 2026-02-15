@@ -12,7 +12,7 @@
 // 描述消耗品或技能类条目产生的单个效果，支持数值来源扩展
 struct ItemEffect {
     EffectType type {EffectType::NONE};
-    int64_t magnitude {0};
+    int64_t magnitude {0}; // 效果数值，可以是绝对值或百分比，具体解释由 scale 决定
     ValueScale scale {ValueScale::ABSOLUTE};
     ValueOwner owner {ValueOwner::TARGET};
     int durationTurn {0};
@@ -28,8 +28,8 @@ struct ItemStackingRule {
 // 控制物品的绑定与交易限制
 struct ItemOwnershipRule {
     bool tradable {true};
-    bool bindOnPickup {false};
-    bool bindOnEquip {false};
+    bool bindOnPickup {false}; // 拾取时绑定
+    bool bindOnEquip {false}; // 装备时绑定
 };
 
 // Item 的轻量级元信息，供索引、显示与通用逻辑使用
@@ -120,7 +120,7 @@ public:
         if (!definition_->IsStackable()) {
             return false;
         }
-        return !bound_ && !other.bound_;
+        return bound_ == other.bound_;
     }
 
 private:

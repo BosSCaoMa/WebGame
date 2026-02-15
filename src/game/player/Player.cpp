@@ -1,5 +1,5 @@
 #include "Player.h"
-#include "ItemConfig.h"
+#include "ShopService.h"
 #include <algorithm>
 
 
@@ -129,90 +129,6 @@ bool Player::loadDataFromServer()
     return true;
 }
 
-
-
-// 物品资源等=====后续实现
-
-// ==================== Package 实现 ====================
-bool Package::addItem(int itemId, int count)
-{
-    // 查找是否已有该物品
-    auto it = itemsMap.find(itemId);
-    if (it != itemsMap.end()) {
-        ItemSlot& slot = it->second;
-        const auto* tmpl = ItemConfig::instance().getItem(itemId);
-        if (!tmpl) return false;
-        
-        // 检查堆叠上限
-        if (slot.count + count <= tmpl->meta.stack.maxStack) {
-            slot.count += count;
-            return true;
-        } else {
-            return false; // 超过堆叠上限
-        }
-    }
-    
-    // 新增物品槽
-    if (itemsMap.size() >= maxItemSlots) {
-        return false;  // 背包已满
-    }
-    
-    itemsMap[itemId] = ItemSlot(itemId, count);
-    return true;
-}
-
-bool Package::removeItem(int itemId, int count)
-{
-    auto it = itemsMap.find(itemId);
-    if (it == itemsMap.end()) {
-        return false;
-    }
-    ItemSlot& slot = it->second;
-    if (slot.count < count) {
-        return false;
-    }
-    slot.count -= count;
-    if (slot.count == 0) {
-        itemsMap.erase(it);
-    }
-    return true;
-}
-
-int Package::getItemCount(int itemId) const
-{
-    auto it = itemsMap.find(itemId);
-    if (it != itemsMap.end()) {
-        return it->second.count;
-    }
-    return 0;
-}
-
-bool Package::addEquipment(const Equipment& equip)
-{
-    if (equipments.size() >= maxEquipSlots) {
-        return false;
-    }
-    equipments.push_back(equip);
-    return true;
-}
-
-// 上装备或出售进行移除
-bool Package::removeEquipment(int index)
-{
-    if (index < 0 || index >= static_cast<int>(equipments.size())) {
-        return false;
-    }
-    equipments.erase(equipments.begin() + index);
-    return true;
-}
-
-const Equipment* Package::getEquipment(int index) const
-{
-    if (index < 0 || index >= static_cast<int>(equipments.size())) {
-        return nullptr;
-    }
-    return &equipments[index];
-}
 // ==================== 资源属性管理 ====================
 void Player::modifyAttribute(PlayerAttrType type, int value)
 {
@@ -247,4 +163,51 @@ bool Player::costResource(int resourceId, int64_t amount) {
 int64_t Player::getResource(int resourceId) const {
     auto it = resources.find(resourceId);
     return it != resources.end() ? it->second : 0;
+}
+
+// ==================== 货币与商城辅助 ====================
+void Player::addCurrency(CurrencyType type, int64_t amount)
+{
+    if (amount == 0) {
+        return;
+    }
+    currencyWallet_[type] += amount;
+}
+
+bool Player::costCurrency(CurrencyType type, int64_t amount)
+{
+    if (amount < 0) {
+        return false;
+    }
+    const int64_t current = getCurrency(type);
+    if (current < amount) {
+        return false;
+    }
+    currencyWallet_[type] = current - amount;
+    return true;
+}
+
+int64_t Player::getCurrency(CurrencyType type) const
+{
+    auto it = currencyWallet_.find(type);
+    return it != currencyWallet_.end() ? it->second : 0;
+}
+
+int Player::getShopPurchaseCount(int offerId) const
+{
+    auto it = shopPurchaseHistory_.find(offerId);
+    return it != shopPurchaseHistory_.end() ? it->second : 0;
+}
+
+void Player::recordShopPurchase(int offerId, int quantity)
+{
+    if (quantity <= 0) {
+        return;
+    }
+    shopPurchaseHistory_[offerId] += quantity;
+}
+
+bool Player::purchaseFromShop(ShopType type, int offerId, int quantity, std::string* errMsg)
+{
+    return ShopService::instance().purchase(*this, type, offerId, quantity, errMsg);
 }

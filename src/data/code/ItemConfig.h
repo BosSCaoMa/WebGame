@@ -93,20 +93,6 @@ private:
     ItemConfig& operator=(const ItemConfig&) = delete;
 
     void init();
-    // void initConsumables();
-    // void initMaterials();
-    // void initEquipments();
-    // void initSetBonuses();
-
-    // // 初始化装备
-    // void initWeapons();
-    // void initArmors();
-    // void initHelmets();
-    // void initBoots();
-    // void initSteeds();
-    // void initTallys();
-    // void initTreasures();
-    // void initFamouss();
     void addToIndex(const ItemTemplate& tmpl);
     void removeFromIndex(const ItemTemplate& tmpl);
     static void RemoveId(std::vector<int>& bucket, int id);
