@@ -151,3 +151,8 @@ bool ShopService::purchase(Player& player, ShopType type, int offerId, int quant
     player.recordShopPurchase(offer.offerId, quantity);
     return true;
 }
+
+void ShopService::clear()
+{
+    offers_.clear();
+}

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(WebGame LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -19,14 +21,13 @@ endif()
 add_subdirectory("${LOGMANAGER_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/LogManager")
 
 # ---- Sources ----
-file(GLOB_RECURSE GAMECLIENT_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE GAMECORE_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
-list(FILTER GAMECLIENT_SOURCES EXCLUDE REGEX "src/network/ConnectProc\\.cpp$")
-list(APPEND GAMECLIENT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+list(FILTER GAMECORE_SOURCES EXCLUDE REGEX "src/network/ConnectProc\\.cpp$")
 
-add_executable(WebGame ${GAMECLIENT_SOURCES})
-target_link_libraries(WebGame PRIVATE LogM)
+add_library(WebGameCore ${GAMECORE_SOURCES})
+target_link_libraries(WebGameCore PUBLIC LogM)
 
 set(PROJECT_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -46,7 +47,7 @@ foreach(header ${PROJECT_HEADER_FILES})
 endforeach()
 list(REMOVE_DUPLICATES PROJECT_INCLUDE_DIRS)
 
-target_include_directories(WebGame PRIVATE ${PROJECT_INCLUDE_DIRS})
+target_include_directories(WebGameCore PUBLIC ${PROJECT_INCLUDE_DIRS})
 
 file(GLOB_RECURSE ALL_HEADERS 
   LIST_DIRECTORIES false
@@ -54,11 +55,14 @@ file(GLOB_RECURSE ALL_HEADERS
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.h"    # lib/下所有.h（含子文件夹）
 )
 
-target_sources(WebGame PRIVATE ${ALL_HEADERS})
+target_sources(WebGameCore PRIVATE ${ALL_HEADERS})
+
+add_executable(WebGame "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+target_link_libraries(WebGame PRIVATE WebGameCore)
 
 # ---- 平台链接 ----
 if(WIN32)
-  target_link_libraries(WebGame PRIVATE ws2_32)
+  target_link_libraries(WebGameCore PUBLIC ws2_32)
 elseif(UNIX)
   find_package(Threads REQUIRED)
   set(CURSES_NEED_WIDE TRUE)
@@ -67,14 +71,19 @@ elseif(UNIX)
   if(NCURSESW_LIBRARY)
     set(CURSES_LIBRARIES ${NCURSESW_LIBRARY})
   endif()
-  target_link_libraries(WebGame PRIVATE Threads::Threads ${CURSES_LIBRARIES})
-  target_include_directories(WebGame PRIVATE ${CURSES_INCLUDE_DIR})
+  target_link_libraries(WebGameCore PUBLIC Threads::Threads ${CURSES_LIBRARIES})
+  target_include_directories(WebGameCore PUBLIC ${CURSES_INCLUDE_DIR})
 endif()
 
 # ---- Debug / RelWithDebInfo 生成符号，方便 gdb/core ----
 if(NOT MSVC)
-  target_compile_options(WebGame PRIVATE
+  target_compile_options(WebGameCore PRIVATE
     $<$<CONFIG:Debug>:-O0 -g3 -fno-omit-frame-pointer>
     $<$<CONFIG:RelWithDebInfo>:-O2 -g2 -fno-omit-frame-pointer>
   )
+endif()
+
+# ---- Tests ----
+if(BUILD_TESTING)
+  add_subdirectory(test)
 endif()

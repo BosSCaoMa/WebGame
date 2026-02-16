@@ -56,6 +56,7 @@ public:
     const ShopOffer* getOffer(ShopType type, int offerId) const;
     std::vector<ShopOffer> listActiveOffers(ShopType type, std::chrono::system_clock::time_point now) const;
     bool purchase(Player& player, ShopType type, int offerId, int quantity, std::string* errMsg = nullptr);
+    void clear();
 
 private:
     ShopService() = default;
