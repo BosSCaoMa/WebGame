@@ -1,0 +1,146 @@
+{
+  "items": [
+    {
+      "id": 1001,
+      "name": "小型治疗药剂",
+      "description": "战斗中回复少量生命值。",
+      "type": "CONSUMABLE",
+      "quality": "GREEN",
+      "stack": {
+        "max": 50,
+        "unique": false,
+        "autoSplit": true
+      },
+      "ownership": {
+        "tradable": true,
+        "bindOnPickup": false,
+        "bindOnEquip": false
+      },
+      "tags": ["potion", "starter", "hp"],
+      "consumable": {
+        "category": "HP_POTION",
+        "cooldownSec": 5,
+        "destroyOnUse": true,
+        "effects": [
+          {
+            "type": "HEAL",
+            "value": 1500,
+            "owner": "TARGET",
+            "scale": "ABSOLUTE"
+          },
+          {
+            "type": "BUFF_REGEN",
+            "value": 5,
+            "owner": "TARGET",
+            "scale": "PERCENT",
+            "duration": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": 1002,
+      "name": "集结号角",
+      "description": "为当前行动的武将回复怒气。",
+      "type": "CONSUMABLE",
+      "quality": "BLUE",
+      "stack": {
+        "max": 20,
+        "unique": false,
+        "autoSplit": true
+      },
+      "consumable": {
+        "category": "RAGE_POTION",
+        "cooldownSec": 8,
+        "destroyOnUse": true,
+        "effects": [
+          {
+            "type": "RAGE_CHANGE",
+            "value": 40,
+            "owner": "TARGET",
+            "scale": "ABSOLUTE"
+          }
+        ]
+      },
+      "tags": ["potion", "rage"]
+    },
+    {
+      "id": 2001,
+      "name": "精制强化矿石",
+      "description": "用于将装备强化至 5 阶。",
+      "type": "MATERIAL",
+      "quality": "GREEN",
+      "material": {
+        "category": "UPGRADE",
+        "tier": 2,
+        "usage": "Feed into the smithy upgrade workflow."
+      },
+      "tags": ["upgrade", "smithy"]
+    },
+    {
+      "id": 3001,
+      "name": "公会荣誉",
+      "description": "参加公会副本获得的货币。",
+      "type": "CURRENCY",
+      "quality": "ORANGE",
+      "currency": {
+        "category": "TOKEN",
+        "precision": 1,
+        "sharedAcrossRoles": true,
+        "allowNegative": false
+      }
+    }
+  ],
+  "equipments": [
+    {
+      "id": 4001,
+      "name": "青铜长剑",
+      "type": "WEAPON",
+      "quality": "GREEN",
+      "skillId": 0,
+      "setId": 5001,
+      "baseAttrs": {
+        "atk": 120,
+        "critRate": 3,
+        "hitRate": 5
+      }
+    },
+    {
+      "id": 4002,
+      "name": "斥候战靴",
+      "type": "BOOTS",
+      "quality": "BLUE",
+      "skillId": 0,
+      "setId": 5001,
+      "baseAttrs": {
+        "speed": 25,
+        "dodgeRate": 4
+      }
+    }
+  ],
+  "setBonuses": [
+    {
+      "setId": 5001,
+      "name": "斥候新锐",
+      "bonuses": [
+        {
+          "pieceCount": 2,
+          "desc": "普通攻击伤害提高 5%。",
+          "skillId": 0,
+          "applyAttr": {
+            "atk": 50,
+            "critRate": 2
+          }
+        },
+        {
+          "pieceCount": 4,
+          "desc": "解锁“斥候突进”技能。",
+          "skillId": 91001,
+          "applyAttr": {
+            "speed": 40
+          }
+        }
+      ]
+    }
+  ]
+}

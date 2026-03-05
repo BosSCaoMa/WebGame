@@ -13,6 +13,7 @@ namespace webgame::net {
 
 NetBootstrap::NetBootstrap() {
     config_ = NetConfig::LoadDefault();
+    LOG_INFO("NetBootstrap config host=%s port=%d ioThreads=%d loginWorkers=%d", config_.host.c_str(), config_.port, config_.ioThreadCount, config_.loginThreadPoolSize);
     RegisterBuiltInHandlers();
 }
 
@@ -62,25 +63,32 @@ void NetBootstrap::Stop() {
 }
 
 void NetBootstrap::RegisterBuiltInHandlers() {
+    LOG_INFO("Register route GET /ping");
     dispatcher_.Register("GET", "/ping", [](const HttpRequest&, TcpConnection& conn) {
+        LOG_INFO("Handle route GET /ping");
         HttpResponse resp;
         resp.SetHeader("Content-Type", "application/json");
         resp.body = "{\"status\":\"pong\"}";
         conn.SendHttpResponse(resp);
     });
 
+    LOG_INFO("Register route POST /echo");
     dispatcher_.Register("POST", "/echo", [](const HttpRequest& req, TcpConnection& conn) {
+        LOG_INFO("Handle route POST /echo body_size=%zu", req.body.size());
         HttpResponse resp;
         resp.SetHeader("Content-Type", "text/plain; charset=utf-8");
         resp.body = req.body;
         conn.SendHttpResponse(resp);
     });
 
+    LOG_INFO("Register route POST /login");
     dispatcher_.Register("POST", "/login", [](const HttpRequest& req, TcpConnection& conn) {
         HttpResponse resp;
         resp.SetHeader("Content-Type", "application/json");
         auto account = req.Header("x-account");
         auto token = req.Header("x-token");
+
+        LOG_INFO("Handle route POST /login account=%s body_size=%zu", account.empty() ? "<empty>" : account.c_str(), req.body.size());
 
         if (account.empty() || token.empty()) {
             resp.statusCode = 400;

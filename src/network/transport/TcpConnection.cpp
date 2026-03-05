@@ -111,6 +111,7 @@ void TcpConnection::HandleReadable() {
             if (!codec_.Decode(inboundBuffer_, request)) {
                 break;
             }
+            LOG_INFO("Decoded HTTP request fd=%d method=%s path=%s body_size=%zu", fd_, request.method.c_str(), request.path.c_str(), request.body.size());
             diag_.IncMessagesIn();
             dispatcher_.Dispatch(request, *this);
             lastActivity_ = std::chrono::steady_clock::now();
@@ -137,6 +138,7 @@ void TcpConnection::HandlePeerClosed() {
         return;
     }
     int fd = fd_;
+    LOG_INFO("Connection closing fd=%d account=%s", fd, ctx_->account.empty() ? "<none>" : ctx_->account.c_str());
     loop_.DetachConnection(fd_);
     if (fd_ >= 0) {
         ::close(fd_);

@@ -20,6 +20,7 @@ void ProtocolDispatcher::Register(const std::string& method, const std::string& 
 }
 
 void ProtocolDispatcher::Dispatch(const HttpRequest& request, TcpConnection& connection) {
+    LOG_INFO("Dispatch request method=%s path=%s fd=%d", request.method.c_str(), request.path.c_str(), connection.Fd());
     Handler handler;
     {
         std::lock_guard<std::mutex> lock(mutex_);

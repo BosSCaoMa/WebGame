@@ -27,8 +27,8 @@ public:
     // ==================== 构造与析构 ====================
     BattleManager(Player* user, Player* enemy, LogCallback logCallback = nullptr);
     ~BattleManager() = default;
-    bool debugging = false;
     void SetDebugging();
+    bool IsDebugging() const;
 
     // ==================== 公共接口 ====================
     
@@ -143,6 +143,7 @@ private:
     
     // 随机数生成器
     std::mt19937 rng_;
+    bool debugging_ = false;
     LogCallback logCallback_;
     LogCallback debugCallback_;
     void setLogCallback(LogCallback callback);

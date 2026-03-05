@@ -21,7 +21,7 @@ void waitSeconds(double seconds)
 
 string GetTargetType(TargetType type) {
     switch (type) {
-        case TargetType::SELF: return "敌方前排";
+        case TargetType::SELF: return "自己";
         case TargetType::ALLY_ALL: return "己方全体";
         case TargetType::ENEMY_SINGLE: return "敌方单个目标";
         case TargetType::ENEMY_COL: return "敌方一列";
@@ -75,10 +75,17 @@ BattleManager::BattleManager(Player* user, Player* enemy, LogCallback logCallbac
 
 void  BattleManager::SetDebugging()
 {
-    debugging = true;
-    debugCallback_ = [](const string& msg) {
-        cout << msg << endl;
-    };
+    debugging_ = true;
+    if (!debugCallback_) {
+        debugCallback_ = [](const string& msg) {
+            cout << msg << endl;
+        };
+    }
+}
+
+bool BattleManager::IsDebugging() const
+{
+    return debugging_;
 }
 
 // ==================== 初始化 ====================
@@ -324,12 +331,6 @@ void BattleManager::executeAction(BattleCharacter* actor)
     }
 
     executeSkill(actor, skill);
-
-    if (actor->isAlive) {
-        actor->tickBuffs();
-    } else {
-        log("  → 行动中死亡，跳过 Buff");
-    }
 
     checkDeaths();
 }
@@ -784,7 +785,6 @@ vector<BattleCharacter*> BattleManager::getTargets(BattleCharacter* caster, Targ
         case TargetType::ENEMY_RANDOM_3: {
             int count = static_cast<int>(type) - static_cast<int>(TargetType::ENEMY_RANDOM_1) + 1;
             return selectRandom(enemyTeamRef, count);
-            return {};
         }
         default:
             return {};
@@ -889,8 +889,10 @@ vector<BattleCharacter*> BattleManager::selectByAttr(vector<BattleCharacter>& te
 // ==================== 技能触发 ====================
 void BattleManager::triggerSkills(SkillTrigger trigger)
 {
-    for (BattleCharacter* ch : actionOrder_) {
-        if (debugging) {
+    calculateActionOrder();
+    const vector<BattleCharacter*> triggerOrder = actionOrder_;
+    for (BattleCharacter* ch : triggerOrder) {
+        if (debugging_) {
             waitSeconds(0.5); // 每个人物行动前等待0.5秒，增加节奏感
         }
         triggerSkills(trigger, ch);
@@ -914,7 +916,7 @@ void BattleManager::triggerSkills(SkillTrigger trigger, BattleCharacter* specifi
         if (skill.id == 0) {
             continue;
         }
-        if (debugging) {
+        if (debugging_) {
             waitSeconds(0.3); // 每个技能触发前等待0.3秒，增加节奏感
         }
         log(specificCharacter->name + " 触发技能: " + skill.name);
@@ -1243,7 +1245,7 @@ void BattleManager::log(const string& message) {
 }
 
 void BattleManager::debug(const string& message) {
-    if (debugging) {
+    if (debugging_ && debugCallback_) {
         debugCallback_(message);
     }
 }

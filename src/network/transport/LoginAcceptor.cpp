@@ -114,6 +114,10 @@ void LoginAcceptor::AcceptLoop()
             continue;
         }
 
+        char ipBuf[INET_ADDRSTRLEN] = {0};
+        ::inet_ntop(AF_INET, &clientAddr.sin_addr, ipBuf, sizeof(ipBuf));
+        LOG_INFO("Accepted raw connection fd=%d from %s:%d", fd, ipBuf, ntohs(clientAddr.sin_port));
+
         // 先快速做风控/限流，失败直接丢弃连接
         if (!GuardFilter(clientAddr)) {
             diag_.IncRejected();
@@ -176,6 +180,7 @@ void LoginAcceptor::ProcessTask(int fd, const sockaddr_in& addr) {
     }
 
     diag_.IncAccepted();
+    LOG_INFO("Handshake success fd=%d -> dispatch to EventLoop", fd);
     EventLoop* targetLoop = &loopGroup_.NextLoop();
     targetLoop->QueueInLoop([attachFd = fd, ctx, targetLoop]() {
         if (!targetLoop->AttachConnection(attachFd, ctx)) {
