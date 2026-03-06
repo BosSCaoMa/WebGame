@@ -1,0 +1,73 @@
+{
+  "flow_mode": "auto",
+  "stable_success_threshold": 99.9,
+  "lowlat_p95_threshold_ms": 10000,
+  "total_runs": 2,
+  "rows": [
+    {
+      "timestamp": "20260306_211119",
+      "flow_mode": "auto",
+      "flow_users": 20,
+      "concurrency": 5,
+      "success_rate_percent": 100.0,
+      "flow_rps": 10.32,
+      "failed_flows": 0,
+      "p95": 515.0,
+      "avg": 442.35,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119"
+    },
+    {
+      "timestamp": "20260306_211123",
+      "flow_mode": "auto",
+      "flow_users": 40,
+      "concurrency": 10,
+      "success_rate_percent": 100.0,
+      "flow_rps": 11.83,
+      "failed_flows": 0,
+      "p95": 1095.0,
+      "avg": 780.7,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123"
+    }
+  ],
+  "peak": {
+    "timestamp": "20260306_211123",
+    "flow_mode": "auto",
+    "flow_users": 40,
+    "concurrency": 10,
+    "success_rate_percent": 100.0,
+    "flow_rps": 11.83,
+    "failed_flows": 0,
+    "p95": 1095.0,
+    "avg": 780.7,
+    "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.json",
+    "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123"
+  },
+  "stable": {
+    "timestamp": "20260306_211123",
+    "flow_mode": "auto",
+    "flow_users": 40,
+    "concurrency": 10,
+    "success_rate_percent": 100.0,
+    "flow_rps": 11.83,
+    "failed_flows": 0,
+    "p95": 1095.0,
+    "avg": 780.7,
+    "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.json",
+    "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123"
+  },
+  "lowlat": {
+    "timestamp": "20260306_211123",
+    "flow_mode": "auto",
+    "flow_users": 40,
+    "concurrency": 10,
+    "success_rate_percent": 100.0,
+    "flow_rps": 11.83,
+    "failed_flows": 0,
+    "p95": 1095.0,
+    "avg": 780.7,
+    "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.json",
+    "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123"
+  }
+}

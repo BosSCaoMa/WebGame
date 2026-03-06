@@ -1,0 +1,47 @@
+battle flow benchmark summary
+timestamp=20260306_211119
+url=http://127.0.0.1:18888/battle
+flow_users=20
+concurrency=5
+flow_mode=auto
+attack_steps=6
+
+throughput
+  total_flows=20
+  success_flows=20
+  failed_flows=0
+  success_rate_percent=100.00
+  elapsed_ms=1938
+  flow_rps=10.32
+
+flow_latency_ms
+  min=361
+  avg=442.350
+  p50=437
+  p90=513
+  p95=515
+  p99=515
+  max=564
+
+battle_progress
+  avg_attacks_done=0.00
+  avg_round=11.00
+  ended_within_steps_percent=100.00
+
+battle_outcome
+  win=20
+  lose=0
+  draw=0
+  ended_by_client=0
+  ongoing=0
+
+stage_distribution
+ok	20
+
+result_distribution
+win	20
+
+files
+  raw_metrics=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/raw_metrics.tsv
+  summary_json=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/summary.json
+  server_log=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/server.log

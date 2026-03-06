@@ -1,0 +1,3 @@
+users	concurrency	exit_code	success_rate_percent	flow_rps	p95_ms	avg_ms	failed_flows	result_dir
+20	5	0	100.0	10.32	515	442.35	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119
+40	10	0	100.0	11.83	1095	780.7	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123

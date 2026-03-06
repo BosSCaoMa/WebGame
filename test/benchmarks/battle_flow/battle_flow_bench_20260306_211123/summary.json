@@ -1,0 +1,44 @@
+{
+  "timestamp": "20260306_211123",
+  "url": "http://127.0.0.1:18888/battle",
+  "flow_users": 40,
+  "concurrency": 10,
+  "flow_mode": "auto",
+  "attack_steps": 6,
+  "throughput": {
+    "total_flows": 40,
+    "success_flows": 40,
+    "failed_flows": 0,
+    "success_rate_percent": 100.00,
+    "elapsed_ms": 3382,
+    "flow_rps": 11.83
+  },
+  "flow_latency_ms": {
+    "min": 484,
+    "avg": 780.700,
+    "p50": 771,
+    "p90": 981,
+    "p95": 1095,
+    "p99": 1133,
+    "max": 1177
+  },
+  "battle_progress": {
+    "avg_attacks_done": 0.00,
+    "avg_round": 11.00,
+    "ended_within_steps_percent": 100.00
+  },
+  "battle_outcome": {
+    "win": 40,
+    "lose": 0,
+    "draw": 0,
+    "ended_by_client": 0,
+    "ongoing": 0
+  },
+  "stage_distribution": {"ok":40},
+  "result_distribution": {"win":40},
+  "files": {
+    "raw_metrics": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/raw_metrics.tsv",
+    "summary_txt": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.txt",
+    "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123/summary.json"
+  }
+}

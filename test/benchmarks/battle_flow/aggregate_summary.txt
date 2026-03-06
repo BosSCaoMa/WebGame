@@ -1,0 +1,17 @@
+battle_flow aggregate summary
+flow_mode=auto
+stable_success_threshold=99.9
+lowlat_p95_threshold_ms=10000
+
+users	conc	success_rate_percent	flow_rps	p95_ms	avg_ms	failed_flows	result_dir
+20	5	100.00	10.32	515	442.4	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119
+40	10	100.00	11.83	1095	780.7	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+
+peak
+users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+
+stable
+users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+
+lowlat
+users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123

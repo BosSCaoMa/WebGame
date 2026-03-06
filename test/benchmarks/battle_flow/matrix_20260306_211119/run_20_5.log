@@ -1,0 +1,12 @@
+[bench_battle_flow] output dir: /home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119
+[bench_battle_flow] target: http://127.0.0.1:18888/battle
+[bench_battle_flow] users=20, concurrency=5, mode=auto, attack_steps=6
+[bench_battle_flow] done
+[bench_battle_flow] summary: /home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/summary.txt
+[bench_battle_flow] summary json: /home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119/summary.json
+[summarize_battle_flow] total_runs=1
+[summarize_battle_flow] text=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/aggregate_summary.txt
+[summarize_battle_flow] json=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/aggregate_summary.json
+[summarize_battle_flow] peak=users=20, conc=5, mode=auto, success=100.00%, rps=10.32, p95=515ms, avg=442.4ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119
+[bench_battle_flow] aggregate summary: /home/ubuntu/code/WebGame/test/benchmarks/battle_flow/aggregate_summary.txt
+[bench_battle_flow] aggregate json: /home/ubuntu/code/WebGame/test/benchmarks/battle_flow/aggregate_summary.json
