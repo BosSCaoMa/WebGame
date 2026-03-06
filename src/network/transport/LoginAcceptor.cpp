@@ -8,6 +8,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -80,32 +81,63 @@ void LoginAcceptor::Stop() {
     if (!running_.exchange(false)) {
         return;
     }
+    LOG_INFO("LoginAcceptor stopping...");
     if (listenFd_ >= 0) {
+        ::shutdown(listenFd_, SHUT_RDWR);
         ::close(listenFd_);
         listenFd_ = -1;
     }
     if (acceptThread_.joinable()) {
+        LOG_INFO("LoginAcceptor waiting accept thread...");
         acceptThread_.join();
+        LOG_INFO("LoginAcceptor accept thread joined");
     }
 
     workerRunning_.store(false);
     queueCv_.notify_all();
+    LOG_INFO("LoginAcceptor waiting worker threads...");
     for (auto& th : workerThreads_) {
         if (th.joinable()) {
             th.join();
         }
     }
     workerThreads_.clear();
+    LOG_INFO("LoginAcceptor stopped");
 }
 
 void LoginAcceptor::AcceptLoop()
 {
     while (running_.load()) {
+        pollfd pfd{};
+        pfd.fd = listenFd_;
+        pfd.events = POLLIN;
+        int pollRet = ::poll(&pfd, 1, 500);
+        if (pollRet < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            if (!running_.load()) {
+                break;
+            }
+            LOG_ERROR("poll on listen fd failed: %s", strerror(errno));
+            continue;
+        }
+        if (pollRet == 0) {
+            continue;
+        }
+
         sockaddr_in clientAddr{};
         socklen_t len = sizeof(clientAddr);
         int fd = ::accept4(listenFd_, reinterpret_cast<sockaddr*>(&clientAddr), &len, SOCK_CLOEXEC);
         if (fd < 0) {
             if (errno == EINTR) {
+                continue;
+            }
+            if (errno == EBADF || errno == EINVAL) {
+                if (!running_.load()) {
+                    break;
+                }
+                LOG_WARN("accept interrupted by invalid listen fd");
                 continue;
             }
             if (errno == EMFILE || errno == ENFILE) {
@@ -127,6 +159,7 @@ void LoginAcceptor::AcceptLoop()
 
         EnqueueConnection(fd, clientAddr);
     }
+    LOG_INFO("LoginAcceptor accept loop exited");
 }
 
 bool LoginAcceptor::GuardFilter(const sockaddr_in& addr) const {

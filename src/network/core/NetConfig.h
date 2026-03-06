@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdlib>
+#include <cstring>
 #include <cstdint>
 #include <string>
 
@@ -18,6 +20,16 @@ struct NetConfig {
 
     static NetConfig LoadDefault() {
         NetConfig cfg;
+        if (const char* envHost = std::getenv("WEBGAME_HOST"); envHost && envHost[0] != '\0') {
+            cfg.host = envHost;
+        }
+        if (const char* envPort = std::getenv("WEBGAME_PORT"); envPort && envPort[0] != '\0') {
+            char* end = nullptr;
+            long port = std::strtol(envPort, &end, 10);
+            if (end != envPort && *end == '\0' && port > 0 && port <= 65535) {
+                cfg.port = static_cast<uint16_t>(port);
+            }
+        }
         return cfg;
     };
 };

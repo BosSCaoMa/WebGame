@@ -1,8 +1,11 @@
 #include "NetworkModule.h"
+#include "CharacterConfig.h"
+#include "SkillConfig.h"
 
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <filesystem>
 #include <iostream>
 #include <thread>
 
@@ -17,6 +20,43 @@ void SignalHandler(int)
 
 bool LoadDataConfig()
 {
+    namespace fs = std::filesystem;
+
+    const std::vector<fs::path> roots = {
+        fs::current_path(),
+        fs::current_path() / "..",
+        fs::current_path() / "../..",
+    };
+
+    fs::path skillPath;
+    fs::path characterPath;
+
+    for (const auto& root : roots) {
+        fs::path s = root / "src/data/config/skills.json";
+        fs::path c = root / "src/data/config/characters.json";
+        if (fs::exists(s) && fs::exists(c)) {
+            skillPath = s;
+            characterPath = c;
+            break;
+        }
+    }
+
+    if (skillPath.empty() || characterPath.empty()) {
+        std::cout << "未找到技能或武将配置文件" << std::endl;
+        return false;
+    }
+
+    if (!SkillConfig::instance().loadFromFile(skillPath.string())) {
+        std::cout << "加载技能配置失败: " << skillPath << std::endl;
+        return false;
+    }
+
+    if (!CharacterConfig::instance().loadFromFile(characterPath.string())) {
+        std::cout << "加载武将配置失败: " << characterPath << std::endl;
+        return false;
+    }
+
+    std::cout << "配置加载完成: " << skillPath << " , " << characterPath << std::endl;
 
     return true;
 }
