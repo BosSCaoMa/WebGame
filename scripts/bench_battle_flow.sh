@@ -2,10 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_BASE_DIR="${LOG_BASE_DIR:-${ROOT_DIR}/build/log}"
+BENCH_ROOT_DIR="${BENCH_ROOT_DIR:-${ROOT_DIR}/test/benchmarks}"
+LOG_BASE_DIR="${LOG_BASE_DIR:-${BENCH_ROOT_DIR}/battle_flow}"
 FLOW_USERS="${FLOW_USERS:-200}"
 CONCURRENCY="${CONCURRENCY:-40}"
 ATTACK_STEPS="${ATTACK_STEPS:-6}"
+FLOW_MODE="${FLOW_MODE:-auto}"
 WEBGAME_PORT="${WEBGAME_PORT:-18888}"
 WEBGAME_HOST="${WEBGAME_HOST:-127.0.0.1}"
 AUTO_START_SERVER="${AUTO_START_SERVER:-1}"
@@ -20,6 +22,8 @@ RAW_METRICS_FILE="${OUT_DIR}/raw_metrics.tsv"
 SUMMARY_TXT="${OUT_DIR}/summary.txt"
 SUMMARY_JSON="${OUT_DIR}/summary.json"
 SERVER_LOG="${OUT_DIR}/server.log"
+AGGREGATE_SUMMARY_TXT="${LOG_BASE_DIR}/aggregate_summary.txt"
+AGGREGATE_SUMMARY_JSON="${LOG_BASE_DIR}/aggregate_summary.json"
 
 SERVER_PID=""
 
@@ -47,7 +51,7 @@ percentile_from_sorted_file() {
 mkdir -p "${OUT_DIR}" "${TMP_DIR}"
 echo "[bench_battle_flow] output dir: ${OUT_DIR}"
 echo "[bench_battle_flow] target: ${URL}"
-echo "[bench_battle_flow] users=${FLOW_USERS}, concurrency=${CONCURRENCY}, attack_steps=${ATTACK_STEPS}"
+echo "[bench_battle_flow] users=${FLOW_USERS}, concurrency=${CONCURRENCY}, mode=${FLOW_MODE}, attack_steps=${ATTACK_STEPS}"
 
 if [[ "${AUTO_START_SERVER}" == "1" ]]; then
   WEBGAME_PORT="${WEBGAME_PORT}" WEBGAME_HOST="${WEBGAME_HOST}" "${ROOT_DIR}/scripts/run_server.sh" > "${SERVER_LOG}" 2>&1 &
@@ -63,6 +67,7 @@ trap cleanup EXIT
 
 export FLOW_URL="${URL}"
 export FLOW_ATTACK_STEPS="${ATTACK_STEPS}"
+export FLOW_MODE="${FLOW_MODE}"
 export FLOW_TMP_DIR="${TMP_DIR}"
 export FLOW_ACCOUNT_PREFIX="${ACCOUNT_PREFIX}"
 
@@ -79,6 +84,7 @@ http_code=200
 attacks_done=0
 ended=0
 result="ongoing"
+final_round=0
 
 start_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"start\"}" -w "\n%{http_code}")
 start_code=$(printf "%s" "${start_body}" | tail -n1)
@@ -100,47 +106,64 @@ if [[ "${ok}" == "1" ]]; then
 fi
 
 if [[ "${ok}" == "1" ]]; then
-  for _ in $(seq 1 "${FLOW_ATTACK_STEPS}"); do
-    atk_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"attack\",\"battle_id\":\"${battle_id}\"}" -w "\n%{http_code}")
-    atk_code=$(printf "%s" "${atk_body}" | tail -n1)
-    atk_json=$(printf "%s" "${atk_body}" | sed "\$d")
-    if [[ "${atk_code}" != "200" ]]; then
+  if [[ "${FLOW_MODE}" == "auto" ]]; then
+    auto_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"auto\",\"battle_id\":\"${battle_id}\"}" -w "\n%{http_code}")
+    auto_code=$(printf "%s" "${auto_body}" | tail -n1)
+    auto_json=$(printf "%s" "${auto_body}" | sed "\$d")
+    if [[ "${auto_code}" != "200" ]]; then
       ok=0
-      stage="attack"
-      http_code=${atk_code}
-      break
+      stage="auto"
+      http_code=${auto_code}
+    else
+      ended=$(printf "%s" "${auto_json}" | python3 -c "import json,sys; print(\"1\" if json.load(sys.stdin).get(\"session\",{}).get(\"ended\") else \"0\")" 2>/dev/null || echo 0)
+      result=$(printf "%s" "${auto_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"result\",\"ongoing\"))" 2>/dev/null || echo ongoing)
+      final_round=$(printf "%s" "${auto_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"round\",0))" 2>/dev/null || echo 0)
     fi
-    attacks_done=$((attacks_done + 1))
-    ended_flag=$(printf "%s" "${atk_json}" | python3 -c "import json,sys; print(\"1\" if json.load(sys.stdin).get(\"session\",{}).get(\"ended\") else \"0\")" 2>/dev/null || echo 0)
-    result=$(printf "%s" "${atk_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"result\",\"ongoing\"))" 2>/dev/null || echo ongoing)
-    if [[ "${ended_flag}" == "1" ]]; then
-      ended=1
-      break
-    fi
-  done
-fi
-
-if [[ "${ok}" == "1" ]]; then
-  end_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"end\",\"battle_id\":\"${battle_id}\"}" -w "\n%{http_code}")
-  end_code=$(printf "%s" "${end_body}" | tail -n1)
-  end_json=$(printf "%s" "${end_body}" | sed "\$d")
-  if [[ "${end_code}" != "200" ]]; then
-    ok=0
-    stage="end"
-    http_code=${end_code}
   else
-    result=$(printf "%s" "${end_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"result\",\"ongoing\"))" 2>/dev/null || echo ongoing)
+    for _ in $(seq 1 "${FLOW_ATTACK_STEPS}"); do
+      atk_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"attack\",\"battle_id\":\"${battle_id}\"}" -w "\n%{http_code}")
+      atk_code=$(printf "%s" "${atk_body}" | tail -n1)
+      atk_json=$(printf "%s" "${atk_body}" | sed "\$d")
+      if [[ "${atk_code}" != "200" ]]; then
+        ok=0
+        stage="attack"
+        http_code=${atk_code}
+        break
+      fi
+      attacks_done=$((attacks_done + 1))
+      ended_flag=$(printf "%s" "${atk_json}" | python3 -c "import json,sys; print(\"1\" if json.load(sys.stdin).get(\"session\",{}).get(\"ended\") else \"0\")" 2>/dev/null || echo 0)
+      result=$(printf "%s" "${atk_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"result\",\"ongoing\"))" 2>/dev/null || echo ongoing)
+      final_round=$(printf "%s" "${atk_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"round\",0))" 2>/dev/null || echo 0)
+      if [[ "${ended_flag}" == "1" ]]; then
+        ended=1
+        break
+      fi
+    done
+
+    if [[ "${ok}" == "1" ]]; then
+      end_body=$(curl -sS -X POST "${FLOW_URL}" -H "x-account: ${account}" -H "Content-Type: application/json" -d "{\"action\":\"end\",\"battle_id\":\"${battle_id}\"}" -w "\n%{http_code}")
+      end_code=$(printf "%s" "${end_body}" | tail -n1)
+      end_json=$(printf "%s" "${end_body}" | sed "\$d")
+      if [[ "${end_code}" != "200" ]]; then
+        ok=0
+        stage="end"
+        http_code=${end_code}
+      else
+        result=$(printf "%s" "${end_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"result\",\"ongoing\"))" 2>/dev/null || echo ongoing)
+        final_round=$(printf "%s" "${end_json}" | python3 -c "import json,sys; print(json.load(sys.stdin).get(\"session\",{}).get(\"round\",0))" 2>/dev/null || echo 0)
+      fi
+    fi
   fi
 fi
 
 end_ns=$(date +%s%N)
 elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
 
-echo -e "${id}\t${ok}\t${stage}\t${http_code}\t${elapsed_ms}\t${attacks_done}\t${ended}\t${result}" > "${metric_file}"
+echo -e "${id}\t${ok}\t${stage}\t${http_code}\t${elapsed_ms}\t${attacks_done}\t${ended}\t${result}\t${final_round}" > "${metric_file}"
 ' _ {}
 FLOW_END_NS=$(date +%s%N)
 
-printf "id\tok\tstage\thttp_code\tflow_elapsed_ms\tattacks_done\tended\tresult\n" > "${RAW_METRICS_FILE}"
+printf "id\tok\tstage\thttp_code\tflow_elapsed_ms\tattacks_done\tended\tresult\tfinal_round\n" > "${RAW_METRICS_FILE}"
 find "${TMP_DIR}" -name 'metric_*.tsv' -print0 | sort -z -V | xargs -0 cat >> "${RAW_METRICS_FILE}"
 
 TOTAL=$(awk 'END{print NR-1}' "${RAW_METRICS_FILE}")
@@ -163,7 +186,14 @@ LAT_P95=$(percentile_from_sorted_file "${FLOW_LAT_FILE}" 0.95)
 LAT_P99=$(percentile_from_sorted_file "${FLOW_LAT_FILE}" 0.99)
 
 AVG_ATTACKS=$(awk -F'\t' 'NR>1{sum+=$6} END{if(NR<=1) print "0"; else printf "%.2f", sum/(NR-1)}' "${RAW_METRICS_FILE}")
+AVG_ROUND=$(awk -F'\t' 'NR>1{sum+=$9} END{if(NR<=1) print "0.00"; else printf "%.2f", sum/(NR-1)}' "${RAW_METRICS_FILE}")
 ENDED_RATIO=$(awk -F'\t' 'NR>1{sum+=$7} END{if(NR<=1) print "0.00"; else printf "%.2f", (sum*100)/(NR-1)}' "${RAW_METRICS_FILE}")
+
+WIN_COUNT=$(awk -F'\t' 'NR>1 && $8=="win" {cnt++} END{print cnt+0}' "${RAW_METRICS_FILE}")
+LOSE_COUNT=$(awk -F'\t' 'NR>1 && $8=="lose" {cnt++} END{print cnt+0}' "${RAW_METRICS_FILE}")
+DRAW_COUNT=$(awk -F'\t' 'NR>1 && $8=="draw" {cnt++} END{print cnt+0}' "${RAW_METRICS_FILE}")
+ENDED_BY_CLIENT_COUNT=$(awk -F'\t' 'NR>1 && $8=="ended_by_client" {cnt++} END{print cnt+0}' "${RAW_METRICS_FILE}")
+ONGOING_COUNT=$(awk -F'\t' 'NR>1 && $8=="ongoing" {cnt++} END{print cnt+0}' "${RAW_METRICS_FILE}")
 
 STAGE_DISTRIBUTION=$(awk -F'\t' 'NR>1{cnt[$3]++} END{for (k in cnt) printf "%s\t%d\n", k, cnt[k]}' "${RAW_METRICS_FILE}" | sort)
 RESULT_DISTRIBUTION=$(awk -F'\t' 'NR>1{cnt[$8]++} END{for (k in cnt) printf "%s\t%d\n", k, cnt[k]}' "${RAW_METRICS_FILE}" | sort)
@@ -174,6 +204,7 @@ RESULT_DISTRIBUTION=$(awk -F'\t' 'NR>1{cnt[$8]++} END{for (k in cnt) printf "%s\
   echo "url=${URL}"
   echo "flow_users=${FLOW_USERS}"
   echo "concurrency=${CONCURRENCY}"
+  echo "flow_mode=${FLOW_MODE}"
   echo "attack_steps=${ATTACK_STEPS}"
   echo ""
   echo "throughput"
@@ -195,7 +226,15 @@ RESULT_DISTRIBUTION=$(awk -F'\t' 'NR>1{cnt[$8]++} END{for (k in cnt) printf "%s\
   echo ""
   echo "battle_progress"
   echo "  avg_attacks_done=${AVG_ATTACKS}"
+  echo "  avg_round=${AVG_ROUND}"
   echo "  ended_within_steps_percent=${ENDED_RATIO}"
+  echo ""
+  echo "battle_outcome"
+  echo "  win=${WIN_COUNT}"
+  echo "  lose=${LOSE_COUNT}"
+  echo "  draw=${DRAW_COUNT}"
+  echo "  ended_by_client=${ENDED_BY_CLIENT_COUNT}"
+  echo "  ongoing=${ONGOING_COUNT}"
   echo ""
   echo "stage_distribution"
   printf "%s\n" "${STAGE_DISTRIBUTION}"
@@ -220,6 +259,7 @@ cat > "${SUMMARY_JSON}" <<EOF
   "url": "${URL}",
   "flow_users": ${FLOW_USERS},
   "concurrency": ${CONCURRENCY},
+  "flow_mode": "${FLOW_MODE}",
   "attack_steps": ${ATTACK_STEPS},
   "throughput": {
     "total_flows": ${TOTAL},
@@ -240,7 +280,15 @@ cat > "${SUMMARY_JSON}" <<EOF
   },
   "battle_progress": {
     "avg_attacks_done": ${AVG_ATTACKS},
+    "avg_round": ${AVG_ROUND},
     "ended_within_steps_percent": ${ENDED_RATIO}
+  },
+  "battle_outcome": {
+    "win": ${WIN_COUNT},
+    "lose": ${LOSE_COUNT},
+    "draw": ${DRAW_COUNT},
+    "ended_by_client": ${ENDED_BY_CLIENT_COUNT},
+    "ongoing": ${ONGOING_COUNT}
   },
   "stage_distribution": {${STAGE_JSON}},
   "result_distribution": {${RESULT_JSON}},
@@ -257,3 +305,16 @@ rm -f "${FLOW_LAT_FILE}"
 echo "[bench_battle_flow] done"
 echo "[bench_battle_flow] summary: ${SUMMARY_TXT}"
 echo "[bench_battle_flow] summary json: ${SUMMARY_JSON}"
+
+if command -v python3 >/dev/null 2>&1; then
+  if python3 "${ROOT_DIR}/scripts/summarize_battle_flow.py" \
+      --base-dir "${LOG_BASE_DIR}" \
+      --flow-mode "${FLOW_MODE}" \
+      --output-txt "${AGGREGATE_SUMMARY_TXT}" \
+      --output-json "${AGGREGATE_SUMMARY_JSON}"; then
+    echo "[bench_battle_flow] aggregate summary: ${AGGREGATE_SUMMARY_TXT}"
+    echo "[bench_battle_flow] aggregate json: ${AGGREGATE_SUMMARY_JSON}"
+  else
+    echo "[bench_battle_flow] warn: aggregate summarize failed"
+  fi
+fi

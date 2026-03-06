@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_BASE_DIR="${LOG_BASE_DIR:-${ROOT_DIR}/build/log}"
+BENCH_ROOT_DIR="${BENCH_ROOT_DIR:-${ROOT_DIR}/build/benchmarks}"
+LOG_BASE_DIR="${LOG_BASE_DIR:-${BENCH_ROOT_DIR}/battle_api}"
 TOTAL_REQUESTS="${TOTAL_REQUESTS:-500}"
 CONCURRENCY="${CONCURRENCY:-50}"
 WEBGAME_PORT="${WEBGAME_PORT:-18888}"

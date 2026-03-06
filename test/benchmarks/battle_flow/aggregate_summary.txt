@@ -5,13 +5,32 @@ lowlat_p95_threshold_ms=10000
 
 users	conc	success_rate_percent	flow_rps	p95_ms	avg_ms	failed_flows	result_dir
 20	5	100.00	10.32	515	442.4	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211119
+20	5	100.00	22.86	253	205.8	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_005417
 40	10	100.00	11.83	1095	780.7	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+400	40	100.00	21.92	2139	1753.1	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002318
+800	80	100.00	21.59	4886	3554.0	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002338
+800	80	100.00	18.62	5862	4075.4	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010510
+1200	120	100.00	21.74	8112	5263.9	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_235540
+1200	120	93.92	21.26	8031	5241.8	73	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_235637
+1200	120	89.33	11.67	18615	9031.4	128	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_235727
+1200	120	97.17	12.27	18340	9389.3	34	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_235740
+1200	120	100.00	21.33	7562	5382.0	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_235953
+1200	120	100.00	21.59	8860	5322.9	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_000133
+1200	120	100.00	21.81	6463	5270.5	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_000535
+1200	120	100.00	21.74	7483	5269.0	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002417
+1200	120	100.00	18.49	8966	6143.4	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010555
+1600	160	100.00	21.92	11156	6957.9	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002514
+1600	160	100.00	18.63	11826	8121.3	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010701
+2400	320	100.00	21.87	16499	13575.3	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002629
+2400	320	100.00	18.58	24343	15747.8	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010828
+3200	480	100.00	21.51	28048	20508.4	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002820
+3200	480	100.00	18.37	36459	23479.8	0	/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_011040
 
 peak
-users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+users=20, conc=5, mode=auto, success=100.00%, rps=22.86, p95=253ms, avg=205.8ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_005417
 
 stable
-users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+users=20, conc=5, mode=auto, success=100.00%, rps=22.86, p95=253ms, avg=205.8ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_005417
 
 lowlat
-users=40, conc=10, mode=auto, success=100.00%, rps=11.83, p95=1095ms, avg=780.7ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260306_211123
+users=20, conc=5, mode=auto, success=100.00%, rps=22.86, p95=253ms, avg=205.8ms, failed=0, dir=/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_005417

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 namespace {
 std::atomic<bool> gRunning{true};

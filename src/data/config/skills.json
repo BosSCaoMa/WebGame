@@ -1,0 +1,114 @@
+{
+  "skills": [
+    {
+      "id": 1001,
+      "name": "基础普攻",
+      "description": "对敌方单体造成100%攻击力伤害",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_SINGLE",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 10000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "name": "怒气斩击",
+      "description": "对敌方单体造成160%攻击力伤害",
+      "trigger": "RAGE_SKILL",
+      "effects": [
+        {
+          "target": "ENEMY_SINGLE",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 16000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 1003,
+      "name": "战术打击",
+      "description": "对敌方单体造成120%攻击力伤害并附带轻度破甲",
+      "trigger": "NORMAL_ATTACK",
+      "effects": [
+        {
+          "target": "ENEMY_SINGLE",
+          "effect": "DAMAGE",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 12000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        },
+        {
+          "target": "ENEMY_SINGLE",
+          "effect": "BUFF_DEF",
+          "valueExpr": {
+            "source": "FIXED",
+            "owner": "CASTER",
+            "scale": "ABSOLUTE",
+            "value": -30
+          },
+          "duration": 1,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    },
+    {
+      "id": 1004,
+      "name": "战地恢复",
+      "description": "恢复己方血量最低单位18%攻击力生命并提升防御",
+      "trigger": "RAGE_SKILL",
+      "effects": [
+        {
+          "target": "ALLY_HP_LOW1",
+          "effect": "HEAL",
+          "valueExpr": {
+            "source": "ATK",
+            "owner": "CASTER",
+            "scale": "PERCENT",
+            "value": 18000
+          },
+          "duration": 0,
+          "chance": 100,
+          "canOverlay": false
+        },
+        {
+          "target": "ALLY_HP_LOW1",
+          "effect": "BUFF_DEF",
+          "valueExpr": {
+            "source": "FIXED",
+            "owner": "CASTER",
+            "scale": "ABSOLUTE",
+            "value": 80
+          },
+          "duration": 2,
+          "chance": 100,
+          "canOverlay": false
+        }
+      ]
+    }
+  ]
+}

@@ -308,7 +308,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             }
 
             const std::string action = payload["action"].get<std::string>();
-            if (action != "start" && action != "attack" && action != "end") {
+            if (action != "start" && action != "attack" && action != "auto" && action != "end") {
                 resp.statusCode = 400;
                 resp.reason = "Bad Request";
                 resp.body = "{\"code\":4003,\"error\":\"unsupported action\"}";
@@ -462,6 +462,40 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                 resp.statusCode = 409;
                 resp.reason = "Conflict";
                 resp.body = "{\"code\":4091,\"error\":\"battle already ended\"}";
+                conn.SendHttpResponse(resp);
+                return;
+            }
+
+            if (action == "auto") {
+                if (!session.manager) {
+                    resp.statusCode = 500;
+                    resp.reason = "Internal Server Error";
+                    resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
+                    conn.SendHttpResponse(resp);
+                    return;
+                }
+
+                BattleManager::Result result = session.manager->runBattle();
+                session.result = ToBattleResultString(result);
+                session.ended = true;
+                session.updatedAtMs = NowMs();
+
+                std::vector<nlohmann::json> events;
+                events.push_back({
+                    {"type", "auto_battle_executed"},
+                    {"round", session.manager->getRound()},
+                    {"result", session.result},
+                });
+
+                nlohmann::json out = {
+                    {"code", 0},
+                    {"status", "ok"},
+                    {"module", "battle"},
+                    {"action", "auto"},
+                    {"events", events},
+                    {"session", SessionToJson(session)},
+                };
+                resp.body = out.dump();
                 conn.SendHttpResponse(resp);
                 return;
             }

@@ -12,11 +12,23 @@ struct NetConfig {
     uint16_t port = 18888;
     int backlog = 128; // 监听队列长度
     int maxConnections = 4096; // 最大连接数
-    int loginThreadPoolSize = 2; // 处理登录的线程池大小
+    int loginThreadPoolSize = 1; // 处理登录的线程池大小
     int heartbeatTimeoutSec = 120;  // 心跳超时时间，单位秒
-    int ioThreadCount = 2; // IO 线程数量，默认为 1，建议根据 CPU 核数调整
+    int ioThreadCount = 3; // IO 线程数量，默认为 3，建议根据 CPU 核数调整
     bool useEdgeTrigger = true; // 是否使用边缘触发模式，默认为 true
     bool enableGuardFilter = true; // 是否启用连接过滤器，默认为 true
+
+    static bool TryReadPositiveIntEnv(const char* key, int& outVal) {
+        if (const char* env = std::getenv(key); env && env[0] != '\0') {
+            char* end = nullptr;
+            long value = std::strtol(env, &end, 10);
+            if (end != env && *end == '\0' && value > 0 && value <= 1024) {
+                outVal = static_cast<int>(value);
+                return true;
+            }
+        }
+        return false;
+    }
 
     static NetConfig LoadDefault() {
         NetConfig cfg;
@@ -30,6 +42,8 @@ struct NetConfig {
                 cfg.port = static_cast<uint16_t>(port);
             }
         }
+        TryReadPositiveIntEnv("WEBGAME_IO_THREADS", cfg.ioThreadCount);
+        TryReadPositiveIntEnv("WEBGAME_LOGIN_WORKERS", cfg.loginThreadPoolSize);
         return cfg;
     };
 };
