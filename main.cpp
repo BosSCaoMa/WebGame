@@ -1,6 +1,7 @@
 #include "NetworkModule.h"
 #include "CharacterConfig.h"
 #include "SkillConfig.h"
+#include "LogM.h"
 
 #include <atomic>
 #include <chrono>
@@ -69,6 +70,7 @@ bool LoadNetworkModule()
 
 int main()
 {
+    LogM::getInstance().setLevel(LOGM_ERROR);
     std::cout << "服务器启动" << std::endl;
 
     std::signal(SIGINT, SignalHandler);

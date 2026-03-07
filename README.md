@@ -184,9 +184,29 @@ python3 scripts/summarize_battle_flow.py \
 
 脚本会采集线程占用、上下文切换、运行队列、系统调用占比与可选 perf 热点，并输出自动诊断结论。
 
+支持两种模式：
+
+- `PROFILE_MODE=timed`：按固定时长采样（自动结束）。
+- `PROFILE_MODE=interactive`：交互式采样（输入结束命令后停止）。
+
+#### 固定时长模式（timed）
+
 ```bash
 cd /home/ubuntu/code/WebGame
-RUN_MATRIX=1 DURATION_SEC=20 MATRIX_POINTS="400:40,800:80,1200:120" ./scripts/profile_quick.sh
+PROFILE_MODE=timed RUN_MATRIX=1 DURATION_SEC=20 MATRIX_POINTS="400:40,800:80,1200:120" ./scripts/profile_quick.sh
+```
+
+#### 交互模式（interactive，一键起服 + 手动结束）
+
+```bash
+cd /home/ubuntu/code/WebGame
+PROFILE_MODE=interactive START_SERVER=1 RUN_MATRIX=0 WEBGAME_PORT=18888 ./scripts/profile_quick.sh
+```
+
+脚本启动后输入结束命令（默认是 `stop`）：
+
+```bash
+stop
 ```
 
 结果目录：`test/benchmarks/profiling_时间戳/`
@@ -201,10 +221,21 @@ RUN_MATRIX=1 DURATION_SEC=20 MATRIX_POINTS="400:40,800:80,1200:120" ./scripts/pr
 
 常用参数：
 
-- `RUN_MATRIX`：`1` 联动阶梯压测，`0` 仅对当前运行进程采样。
-- `TARGET_PID`：指定进程 PID（`RUN_MATRIX=0` 时常用）。
-- `DURATION_SEC`：采样时长（秒）。
+- `PROFILE_MODE`：采样模式。`timed` 固定时长；`interactive` 交互结束。
+- `START_SERVER`：仅在 `interactive` 模式有效。`1` 自动拉起 `build/WebGame`；`0` 不自动起服。
+- `STOP_COMMAND`：交互模式结束命令（默认 `stop`）。
+- `RUN_MATRIX`：`1` 联动阶梯压测；`0` 仅对当前运行中的服务采样。
+- `TARGET_PID`：指定采样进程 PID（常用于 `RUN_MATRIX=0` 且不自动起服）。
+- `DURATION_SEC`：采样时长（秒，`timed` 模式生效）。
+- `SAMPLE_INTERVAL_SEC`：`pidstat/vmstat` 采样间隔（秒）。
 - `MATRIX_POINTS`：联动压测档位。
+- `WEBGAME_HOST` / `WEBGAME_PORT`：自动起服时的监听地址与端口。
+- `WEBGAME_VERBOSE_CONN_LOG`：`1` 打开连接/请求级高频日志；默认关闭以减少锁竞争。
+- `BENCH_ROOT_DIR`：结果根目录（默认 `test/benchmarks`）。
+
+默认行为说明：当 `PROFILE_MODE=interactive` 且 `START_SERVER=1` 时，若未显式传 `WEBGAME_HOST`，脚本默认按 `0.0.0.0` 启动服务（方便远端机器访问）。
+
+说明：`strace` 与 `perf` 可能受系统权限限制；权限不足时脚本会降级执行，仍产出其余统计结果。
 
 ### 独立的 gtest 测试
 测试工程位于 `test/` 目录，拥有自己的 `CMakeLists.txt`，默认不会和主程序一起编译。想运行测试时，请使用单独的构建目录并显式启用 `BUILD_TESTING`：

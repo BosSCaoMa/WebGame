@@ -14,10 +14,26 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace webgame::net {
+
+namespace {
+
+constexpr size_t kAcceptWorkerBatchSize = 16;
+
+bool VerboseConnLogEnabled() {
+    static bool enabled = []() {
+        const char* value = std::getenv("WEBGAME_VERBOSE_CONN_LOG");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
+
+}
 
 LoginAcceptor::LoginAcceptor(const NetConfig& config, EventLoopGroup& loopGroup, NetDiag& diag)
     : config_(config), loopGroup_(loopGroup), diag_(diag) {}
@@ -148,7 +164,9 @@ void LoginAcceptor::AcceptLoop()
 
         char ipBuf[INET_ADDRSTRLEN] = {0};
         ::inet_ntop(AF_INET, &clientAddr.sin_addr, ipBuf, sizeof(ipBuf));
-        LOG_INFO("Accepted raw connection fd=%d from %s:%d", fd, ipBuf, ntohs(clientAddr.sin_port));
+        if (VerboseConnLogEnabled()) {
+            LOG_INFO("Accepted raw connection fd=%d from %s:%d", fd, ipBuf, ntohs(clientAddr.sin_port));
+        }
 
         // 先快速做风控/限流，失败直接丢弃连接
         if (!GuardFilter(clientAddr)) {
@@ -188,7 +206,8 @@ void LoginAcceptor::EnqueueConnection(int fd, const sockaddr_in& addr) {
 
 void LoginAcceptor::WorkerLoop() {
     while (true) {
-        PendingConn task{};
+        std::vector<PendingConn> tasks;
+        tasks.reserve(kAcceptWorkerBatchSize);
         {
             std::unique_lock<std::mutex> lock(queueMutex_);
             queueCv_.wait(lock, [this]() {
@@ -197,10 +216,17 @@ void LoginAcceptor::WorkerLoop() {
             if (!workerRunning_.load() && pendingQueue_.empty()) {
                 break;
             }
-            task = pendingQueue_.front();
-            pendingQueue_.pop_front();
+
+            size_t batch = std::min(kAcceptWorkerBatchSize, pendingQueue_.size());
+            for (size_t i = 0; i < batch; ++i) {
+                tasks.push_back(pendingQueue_.front());
+                pendingQueue_.pop_front();
+            }
         }
-        ProcessTask(task.fd, task.addr);
+
+        for (const auto& task : tasks) {
+            ProcessTask(task.fd, task.addr);
+        }
     }
 }
 
@@ -213,7 +239,9 @@ void LoginAcceptor::ProcessTask(int fd, const sockaddr_in& addr) {
     }
 
     diag_.IncAccepted();
-    LOG_INFO("Handshake success fd=%d -> dispatch to EventLoop", fd);
+    if (VerboseConnLogEnabled()) {
+        LOG_INFO("Handshake success fd=%d -> dispatch to EventLoop", fd);
+    }
     EventLoop* targetLoop = &loopGroup_.NextLoop();
     targetLoop->QueueInLoop([attachFd = fd, ctx, targetLoop]() {
         if (!targetLoop->AttachConnection(attachFd, ctx)) {

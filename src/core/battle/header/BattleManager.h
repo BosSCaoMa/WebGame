@@ -4,6 +4,7 @@
 #include <random>
 #include <functional>
 #include <string>
+#include <deque>
 #include <array>
 #include <unordered_map>
 #include "BattleCharacter.h"
@@ -49,6 +50,7 @@ public:
     const std::vector<BattleCharacter>& getUserTeam() const;
     const std::vector<BattleCharacter>& getEnemyTeam() const;
     const std::unordered_map<int, int64_t>& getDamageStats() const;
+    std::vector<std::string> getRecentBattleLogs(size_t limit = 50) const;
 
 private:
     // ==================== 初始化 ====================
@@ -146,6 +148,8 @@ private:
     bool debugging_ = false;
     LogCallback logCallback_;
     LogCallback debugCallback_;
+    std::deque<std::string> battleLogs_;
+    size_t maxBattleLogs_ = 512;
     void setLogCallback(LogCallback callback);
 
     // 禁止拷贝

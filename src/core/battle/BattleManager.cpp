@@ -64,11 +64,6 @@ BattleManager::BattleManager(Player* user, Player* enemy, LogCallback logCallbac
     , logCallback_(logCallback)
 {
     LOG_INFO("BattleManager initialized, user: %d, enemy: %d", userPlayer_->id, enemyPlayer_->id);
-    if (!logCallback_) {
-        setLogCallback([](const string& msg) {
-            cout << msg << endl;
-        });
-    }
     rng_.seed(random_device{}());
     initBattle();
 }
@@ -94,6 +89,7 @@ void BattleManager::initBattle()
     userTeam_.clear();
     enemyTeam_.clear();
     actionOrder_.clear();
+    battleLogs_.clear();
     round_ = 0;
     result_ = Result::ONGOING;
     
@@ -104,6 +100,7 @@ void BattleManager::initBattle()
 
 void BattleManager::createBattleCharacters()
 {
+    auto battleLogger = [this](const std::string& message) { this->log(message); };
     int idx = 1;
     for (int i = 0; i < static_cast<int>(userPlayer_->battleTeam.size()); ++i) {
         int charId = userPlayer_->battleTeam[i];
@@ -114,7 +111,7 @@ void BattleManager::createBattleCharacters()
         Character* ch = userPlayer_->getCharacter(charId);
         if (ch) {
             userTeam_.emplace_back(ch, idx++);
-            userTeam_.back().setLogger(logCallback_);
+            userTeam_.back().setLogger(battleLogger);
         }
     }
     idx = 1;
@@ -127,7 +124,7 @@ void BattleManager::createBattleCharacters()
         Character* ch = enemyPlayer_->getCharacter(charId);
         if (ch) {
             enemyTeam_.emplace_back(ch, -idx++);
-            enemyTeam_.back().setLogger(logCallback_);
+            enemyTeam_.back().setLogger(battleLogger);
         }
     }
 }
@@ -1202,11 +1199,12 @@ void BattleManager::recordDamage(BattleCharacter* caster, int64_t damage)
 void BattleManager::setLogCallback(LogCallback callback)
 {
     logCallback_ = callback;
+    auto battleLogger = [this](const std::string& message) { this->log(message); };
     for (auto& ch : userTeam_) {
-        ch.setLogger(logCallback_);
+        ch.setLogger(battleLogger);
     }
     for (auto& ch : enemyTeam_) {
-        ch.setLogger(logCallback_);
+        ch.setLogger(battleLogger);
     }
 }
 
@@ -1238,7 +1236,23 @@ const unordered_map<int, int64_t>& BattleManager::getDamageStats() const {
     return damageStats_;
 }
 
+vector<string> BattleManager::getRecentBattleLogs(size_t limit) const
+{
+    if (battleLogs_.empty() || limit == 0) {
+        return {};
+    }
+    if (limit > battleLogs_.size()) {
+        limit = battleLogs_.size();
+    }
+    auto beginIt = battleLogs_.end() - static_cast<std::ptrdiff_t>(limit);
+    return vector<string>(beginIt, battleLogs_.end());
+}
+
 void BattleManager::log(const string& message) {
+    battleLogs_.push_back(message);
+    if (battleLogs_.size() > maxBattleLogs_) {
+        battleLogs_.pop_front();
+    }
     if (logCallback_) {
         logCallback_(message);
     }

@@ -27,6 +27,7 @@ namespace webgame::net {
 namespace {
 
 struct BattleRuntime {
+    std::mutex mutex;
     std::string battleId;
     std::string account;
     std::unique_ptr<Player> user;
@@ -38,7 +39,7 @@ struct BattleRuntime {
 };
 
 std::mutex gBattleSessionMutex;
-std::unordered_map<std::string, std::unique_ptr<BattleRuntime>> gBattleSessions;
+std::unordered_map<std::string, std::shared_ptr<BattleRuntime>> gBattleSessions;
 std::atomic<uint64_t> gBattleIdSeq{1};
 
 uint64_t NowMs() {
@@ -115,6 +116,18 @@ nlohmann::json SessionToJson(const BattleRuntime& session) {
         {"result", session.result},
         {"updated_at_ms", session.updatedAtMs},
     };
+}
+
+nlohmann::json SessionLogsToJson(const BattleRuntime& session, size_t limit = 30) {
+    nlohmann::json logs = nlohmann::json::array();
+    if (!session.manager) {
+        return logs;
+    }
+    auto recentLogs = session.manager->getRecentBattleLogs(limit);
+    for (const auto& line : recentLogs) {
+        logs.push_back(line);
+    }
+    return logs;
 }
 
 int ParsePositiveInt(const nlohmann::json& payload, const char* key, int fallback) {
@@ -317,7 +330,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             }
 
             if (action == "start") {
-                auto runtime = std::make_unique<BattleRuntime>();
+                auto runtime = std::make_shared<BattleRuntime>();
                 runtime->battleId = NewBattleId(account);
                 runtime->account = account;
 
@@ -359,17 +372,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                 const std::string createdBattleId = runtime->battleId;
                 {
                     std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-                    gBattleSessions[createdBattleId] = std::move(runtime);
-                }
-
-                std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-                auto createdIt = gBattleSessions.find(createdBattleId);
-                if (createdIt == gBattleSessions.end() || !createdIt->second) {
-                    resp.statusCode = 500;
-                    resp.reason = "Internal Server Error";
-                    resp.body = "{\"code\":5002,\"error\":\"failed to create battle session\"}";
-                    conn.SendHttpResponse(resp);
-                    return;
+                    gBattleSessions[createdBattleId] = runtime;
                 }
 
                 nlohmann::json out = {
@@ -377,7 +380,8 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                     {"status", "ok"},
                     {"module", "battle"},
                     {"action", "start"},
-                    {"session", SessionToJson(*createdIt->second)},
+                    {"session", SessionToJson(*runtime)},
+                    {"battle_logs", SessionLogsToJson(*runtime)},
                 };
                 resp.body = out.dump();
                 conn.SendHttpResponse(resp);
@@ -418,71 +422,119 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             }
 
             const std::string battleId = payload["battle_id"].get<std::string>();
+            std::shared_ptr<BattleRuntime> sessionPtr;
 
-            std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-            auto it = gBattleSessions.find(battleId);
-            if (it == gBattleSessions.end()) {
-                resp.statusCode = 404;
-                resp.reason = "Not Found";
-                resp.body = "{\"code\":4041,\"error\":\"battle not found\"}";
-                conn.SendHttpResponse(resp);
-                return;
-            }
-
-            BattleRuntime& session = *it->second;
-            if (session.account != account) {
-                resp.statusCode = 403;
-                resp.reason = "Forbidden";
-                resp.body = "{\"code\":4031,\"error\":\"battle does not belong to account\"}";
-                conn.SendHttpResponse(resp);
-                return;
-            }
-
-            if (action == "end") {
-                session.ended = true;
-                if (session.result == "ongoing") {
-                    session.result = "ended_by_client";
+            {
+                std::lock_guard<std::mutex> lock(gBattleSessionMutex);
+                auto it = gBattleSessions.find(battleId);
+                if (it == gBattleSessions.end() || !it->second) {
+                    resp.statusCode = 404;
+                    resp.reason = "Not Found";
+                    resp.body = "{\"code\":4041,\"error\":\"battle not found\"}";
+                    conn.SendHttpResponse(resp);
+                    return;
                 }
-                session.updatedAtMs = NowMs();
-
-                nlohmann::json out = {
-                    {"code", 0},
-                    {"status", "ok"},
-                    {"module", "battle"},
-                    {"action", "end"},
-                    {"session", SessionToJson(session)},
-                };
-                resp.body = out.dump();
-                gBattleSessions.erase(it);
-                conn.SendHttpResponse(resp);
-                return;
+                sessionPtr = it->second;
             }
 
-            if (session.ended) {
-                resp.statusCode = 409;
-                resp.reason = "Conflict";
-                resp.body = "{\"code\":4091,\"error\":\"battle already ended\"}";
-                conn.SendHttpResponse(resp);
-                return;
-            }
+            bool needEraseSession = false;
+            {
+                std::lock_guard<std::mutex> sessionLock(sessionPtr->mutex);
+                BattleRuntime& session = *sessionPtr;
+                if (session.account != account) {
+                    resp.statusCode = 403;
+                    resp.reason = "Forbidden";
+                    resp.body = "{\"code\":4031,\"error\":\"battle does not belong to account\"}";
+                    conn.SendHttpResponse(resp);
+                    return;
+                }
 
-            if (action == "auto") {
+                if (action == "end") {
+                    session.ended = true;
+                    if (session.result == "ongoing") {
+                        session.result = "ended_by_client";
+                    }
+                    session.updatedAtMs = NowMs();
+
+                    nlohmann::json out = {
+                        {"code", 0},
+                        {"status", "ok"},
+                        {"module", "battle"},
+                        {"action", "end"},
+                        {"session", SessionToJson(session)},
+                        {"battle_logs", SessionLogsToJson(session)},
+                    };
+                    resp.body = out.dump();
+                    needEraseSession = true;
+                    conn.SendHttpResponse(resp);
+                    goto battle_handler_exit;
+                }
+
+                if (session.ended) {
+                    resp.statusCode = 409;
+                    resp.reason = "Conflict";
+                    resp.body = "{\"code\":4091,\"error\":\"battle already ended\"}";
+                    conn.SendHttpResponse(resp);
+                    goto battle_handler_exit;
+                }
+
+                if (action == "auto") {
+                    if (!session.manager) {
+                        resp.statusCode = 500;
+                        resp.reason = "Internal Server Error";
+                        resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
+                        conn.SendHttpResponse(resp);
+                        goto battle_handler_exit;
+                    }
+
+                    BattleManager::Result result = session.manager->runBattle();
+                    session.result = ToBattleResultString(result);
+                    session.ended = true;
+                    session.updatedAtMs = NowMs();
+
+                    std::vector<nlohmann::json> events;
+                    events.push_back({
+                        {"type", "auto_battle_executed"},
+                        {"round", session.manager->getRound()},
+                        {"result", session.result},
+                    });
+
+                    nlohmann::json out = {
+                        {"code", 0},
+                        {"status", "ok"},
+                        {"module", "battle"},
+                        {"action", "auto"},
+                        {"events", events},
+                        {"session", SessionToJson(session)},
+                        {"battle_logs", SessionLogsToJson(session)},
+                    };
+                    resp.body = out.dump();
+                    conn.SendHttpResponse(resp);
+                    goto battle_handler_exit;
+                }
+
+                static thread_local std::mt19937 rng(std::random_device{}());
+                (void)rng;
+
                 if (!session.manager) {
                     resp.statusCode = 500;
                     resp.reason = "Internal Server Error";
                     resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
                     conn.SendHttpResponse(resp);
-                    return;
+                    goto battle_handler_exit;
                 }
 
-                BattleManager::Result result = session.manager->runBattle();
+                BattleManager::Result result = session.manager->executeRound();
                 session.result = ToBattleResultString(result);
-                session.ended = true;
+                if (result != BattleManager::Result::ONGOING) {
+                    session.ended = true;
+                }
+
                 session.updatedAtMs = NowMs();
 
                 std::vector<nlohmann::json> events;
                 events.push_back({
-                    {"type", "auto_battle_executed"},
+                    {"type", "round_executed"},
                     {"round", session.manager->getRound()},
                     {"result", session.result},
                 });
@@ -491,51 +543,23 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                     {"code", 0},
                     {"status", "ok"},
                     {"module", "battle"},
-                    {"action", "auto"},
+                    {"action", "attack"},
                     {"events", events},
                     {"session", SessionToJson(session)},
+                    {"battle_logs", SessionLogsToJson(session)},
                 };
                 resp.body = out.dump();
                 conn.SendHttpResponse(resp);
-                return;
             }
 
-            static thread_local std::mt19937 rng(std::random_device{}());
-            (void)rng;
-
-            if (!session.manager) {
-                resp.statusCode = 500;
-                resp.reason = "Internal Server Error";
-                resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
-                conn.SendHttpResponse(resp);
-                return;
+battle_handler_exit:
+            if (needEraseSession) {
+                std::lock_guard<std::mutex> lock(gBattleSessionMutex);
+                auto it = gBattleSessions.find(battleId);
+                if (it != gBattleSessions.end() && it->second == sessionPtr) {
+                    gBattleSessions.erase(it);
+                }
             }
-
-            BattleManager::Result result = session.manager->executeRound();
-            session.result = ToBattleResultString(result);
-            if (result != BattleManager::Result::ONGOING) {
-                session.ended = true;
-            }
-
-            session.updatedAtMs = NowMs();
-
-            std::vector<nlohmann::json> events;
-            events.push_back({
-                {"type", "round_executed"},
-                {"round", session.manager->getRound()},
-                {"result", session.result},
-            });
-
-            nlohmann::json out = {
-                {"code", 0},
-                {"status", "ok"},
-                {"module", "battle"},
-                {"action", "attack"},
-                {"events", events},
-                {"session", SessionToJson(session)},
-            };
-            resp.body = out.dump();
-            conn.SendHttpResponse(resp);
         } catch (const std::exception&) {
             resp.statusCode = 400;
             resp.reason = "Bad Request";

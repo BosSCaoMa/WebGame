@@ -4,12 +4,23 @@
 
 #include "LogM.h"
 
+#include <cstdlib>
+#include <cstring>
+
 namespace webgame::net {
 
 namespace {
 
 std::string MakeKey(const std::string& method, const std::string& path) {
     return method + " " + path;
+}
+
+bool VerboseConnLogEnabled() {
+    static bool enabled = []() {
+        const char* value = std::getenv("WEBGAME_VERBOSE_CONN_LOG");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
 }
 
 }
@@ -20,7 +31,9 @@ void ProtocolDispatcher::Register(const std::string& method, const std::string& 
 }
 
 void ProtocolDispatcher::Dispatch(const HttpRequest& request, TcpConnection& connection) {
-    LOG_INFO("Dispatch request method=%s path=%s fd=%d", request.method.c_str(), request.path.c_str(), connection.Fd());
+    if (VerboseConnLogEnabled()) {
+        LOG_INFO("Dispatch request method=%s path=%s fd=%d", request.method.c_str(), request.path.c_str(), connection.Fd());
+    }
     Handler handler;
     {
         std::lock_guard<std::mutex> lock(mutex_);
