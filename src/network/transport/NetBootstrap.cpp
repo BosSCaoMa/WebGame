@@ -14,33 +14,81 @@
 #include "LogM.h"
 #include "json.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <exception>
 #include <memory>
 #include <mutex>
 #include <random>
+#include <string>
 #include <unordered_map>
 
 namespace webgame::net {
 
 namespace {
+uint64_t NowMs();
 
-struct BattleRuntime {
-    std::mutex mutex;
-    std::string battleId;
-    std::string account;
-    std::unique_ptr<Player> user;
-    std::unique_ptr<Player> enemy;
-    std::unique_ptr<BattleManager> manager;
-    bool ended = false;
-    std::string result = "ongoing";
-    uint64_t updatedAtMs = 0;
+std::atomic<uint64_t> gBattleIdSeq{1};
+const uint64_t gServerStartMs = NowMs();
+
+struct RouteMetric {
+    uint64_t totalRequests = 0;
+    uint64_t errorRequests = 0;
+    uint64_t totalLatencyMs = 0;
+    uint64_t maxLatencyMs = 0;
 };
 
-std::mutex gBattleSessionMutex;
-std::unordered_map<std::string, std::shared_ptr<BattleRuntime>> gBattleSessions;
-std::atomic<uint64_t> gBattleIdSeq{1};
+std::mutex gRouteMetricMutex;
+std::unordered_map<std::string, RouteMetric> gRouteMetrics;
+
+void RecordRouteMetric(const std::string& route, uint64_t latencyMs, int statusCode) {
+    std::lock_guard<std::mutex> lock(gRouteMetricMutex);
+    auto& metric = gRouteMetrics[route];
+    metric.totalRequests += 1;
+    if (statusCode >= 400) {
+        metric.errorRequests += 1;
+    }
+    metric.totalLatencyMs += latencyMs;
+    metric.maxLatencyMs = std::max(metric.maxLatencyMs, latencyMs);
+}
+
+nlohmann::json BuildMetricsSnapshot() {
+    nlohmann::json routes = nlohmann::json::array();
+    uint64_t totalRequests = 0;
+    uint64_t totalErrors = 0;
+
+    std::lock_guard<std::mutex> lock(gRouteMetricMutex);
+    for (const auto& entry : gRouteMetrics) {
+        const auto& route = entry.first;
+        const auto& metric = entry.second;
+        const double avgLatency = metric.totalRequests == 0
+                                    ? 0.0
+                                    : static_cast<double>(metric.totalLatencyMs) / static_cast<double>(metric.totalRequests);
+        totalRequests += metric.totalRequests;
+        totalErrors += metric.errorRequests;
+        routes.push_back({
+            {"route", route},
+            {"requests", metric.totalRequests},
+            {"errors", metric.errorRequests},
+            {"avg_latency_ms", avgLatency},
+            {"max_latency_ms", metric.maxLatencyMs},
+        });
+    }
+
+    std::sort(routes.begin(), routes.end(), [](const nlohmann::json& a, const nlohmann::json& b) {
+        return a.value("route", std::string()) < b.value("route", std::string());
+    });
+
+    const uint64_t nowMs = NowMs();
+    return {
+        {"module", "net_observability"},
+        {"uptime_ms", nowMs - gServerStartMs},
+        {"total_requests", totalRequests},
+        {"total_errors", totalErrors},
+        {"routes", routes},
+    };
+}
 
 uint64_t NowMs() {
     return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -87,47 +135,91 @@ int TeamAliveCount(const std::vector<BattleCharacter>& team) {
     return count;
 }
 
-nlohmann::json SessionToJson(const BattleRuntime& session) {
-    int playerHp = 0;
-    int enemyHp = 0;
-    int playerAlive = 0;
-    int enemyAlive = 0;
-    int round = 0;
-
-    if (session.manager) {
-        const auto& userTeam = session.manager->getUserTeam();
-        const auto& enemyTeam = session.manager->getEnemyTeam();
-        playerHp = TeamHpSum(userTeam);
-        enemyHp = TeamHpSum(enemyTeam);
-        playerAlive = TeamAliveCount(userTeam);
-        enemyAlive = TeamAliveCount(enemyTeam);
-        round = session.manager->getRound();
-    }
-
-    return {
-        {"battle_id", session.battleId},
-        {"account", session.account},
-        {"round", round},
-        {"player_hp", playerHp},
-        {"enemy_hp", enemyHp},
-        {"player_alive", playerAlive},
-        {"enemy_alive", enemyAlive},
-        {"ended", session.ended},
-        {"result", session.result},
-        {"updated_at_ms", session.updatedAtMs},
-    };
-}
-
-nlohmann::json SessionLogsToJson(const BattleRuntime& session, size_t limit = 30) {
+nlohmann::json BattleLogsToJson(BattleManager& manager, size_t limit = 80) {
     nlohmann::json logs = nlohmann::json::array();
-    if (!session.manager) {
-        return logs;
-    }
-    auto recentLogs = session.manager->getRecentBattleLogs(limit);
+    auto recentLogs = manager.getRecentBattleLogs(limit);
     for (const auto& line : recentLogs) {
         logs.push_back(line);
     }
     return logs;
+}
+
+nlohmann::json BuildBattleSummary(const std::string& battleId,
+                                 const std::string& account,
+                                 BattleManager& manager,
+                                 const std::string& result) {
+    const auto& userTeam = manager.getUserTeam();
+    const auto& enemyTeam = manager.getEnemyTeam();
+    return {
+        {"battle_id", battleId},
+        {"account", account},
+        {"round", manager.getRound()},
+        {"player_hp", TeamHpSum(userTeam)},
+        {"enemy_hp", TeamHpSum(enemyTeam)},
+        {"player_alive", TeamAliveCount(userTeam)},
+        {"enemy_alive", TeamAliveCount(enemyTeam)},
+        {"ended", true},
+        {"result", result},
+        {"updated_at_ms", NowMs()},
+    };
+}
+
+nlohmann::json BuildDamageBoard(BattleManager& manager) {
+    nlohmann::json board = nlohmann::json::array();
+    const auto& stats = manager.getDamageStats();
+
+    auto appendTeam = [&](const std::vector<BattleCharacter>& team, const char* side) {
+        for (const auto& ch : team) {
+            int64_t damage = 0;
+            auto it = stats.find(ch.battleId);
+            if (it != stats.end()) {
+                damage = it->second;
+            }
+            board.push_back({
+                {"side", side},
+                {"battle_id", ch.battleId},
+                {"name", ch.name},
+                {"damage", damage},
+                {"alive", ch.isAlive},
+            });
+        }
+    };
+
+    appendTeam(manager.getUserTeam(), "user");
+    appendTeam(manager.getEnemyTeam(), "enemy");
+
+    std::sort(board.begin(), board.end(), [](const nlohmann::json& a, const nlohmann::json& b) {
+        return a.value("damage", 0LL) > b.value("damage", 0LL);
+    });
+
+    return board;
+}
+
+nlohmann::json BuildDamageSummary(const nlohmann::json& board) {
+    int64_t userTotal = 0;
+    int64_t enemyTotal = 0;
+    std::string mvpName;
+    int64_t mvpDamage = 0;
+
+    for (const auto& row : board) {
+        const int64_t dmg = row.value("damage", 0LL);
+        if (row.value("side", std::string()) == "user") {
+            userTotal += dmg;
+        } else {
+            enemyTotal += dmg;
+        }
+        if (dmg > mvpDamage) {
+            mvpDamage = dmg;
+            mvpName = row.value("name", std::string("-"));
+        }
+    }
+
+    return {
+        {"user_total", userTotal},
+        {"enemy_total", enemyTotal},
+        {"mvp_name", mvpName},
+        {"mvp_damage", mvpDamage},
+    };
 }
 
 int ParsePositiveInt(const nlohmann::json& payload, const char* key, int fallback) {
@@ -139,6 +231,35 @@ int ParsePositiveInt(const nlohmann::json& payload, const char* key, int fallbac
     }
     int val = payload[key].get<int>();
     return val > 0 ? val : -1;
+}
+
+std::vector<int> ParseTeamConfigIds(const nlohmann::json& payload, const char* key) {
+    std::vector<int> ids;
+    if (!payload.contains(key) || !payload[key].is_array()) {
+        return ids;
+    }
+    for (const auto& node : payload[key]) {
+        if (node.is_number_integer()) {
+            int id = node.get<int>();
+            if (id > 0) {
+                ids.push_back(id);
+            }
+            continue;
+        }
+
+        if (node.is_object()) {
+            int id = 0;
+            if (node.contains("id") && node["id"].is_number_integer()) {
+                id = node["id"].get<int>();
+            } else if (node.contains("character_id") && node["character_id"].is_number_integer()) {
+                id = node["character_id"].get<int>();
+            }
+            if (id > 0) {
+                ids.push_back(id);
+            }
+        }
+    }
+    return ids;
 }
 
 std::vector<int> ParseTeamIds(const nlohmann::json& payload, const char* key) {
@@ -243,25 +364,44 @@ void NetBootstrap::Stop() {
 void NetBootstrap::RegisterBuiltInHandlers() {
     LOG_INFO("Register route GET /ping");
     dispatcher_.Register("GET", "/ping", [](const HttpRequest&, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
         LOG_INFO("Handle route GET /ping");
         HttpResponse resp;
         resp.SetHeader("Content-Type", "application/json");
         resp.body = "{\"status\":\"pong\"}";
+        RecordRouteMetric("GET /ping", NowMs() - startedMs, resp.statusCode);
+        conn.SendHttpResponse(resp);
+    });
+
+    LOG_INFO("Register route GET /metrics");
+    dispatcher_.Register("GET", "/metrics", [](const HttpRequest&, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        resp.SetHeader("Content-Type", "application/json");
+        resp.body = BuildMetricsSnapshot().dump();
+        RecordRouteMetric("GET /metrics", NowMs() - startedMs, resp.statusCode);
         conn.SendHttpResponse(resp);
     });
 
     LOG_INFO("Register route POST /echo");
     dispatcher_.Register("POST", "/echo", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
         LOG_INFO("Handle route POST /echo body_size=%zu", req.body.size());
         HttpResponse resp;
         resp.SetHeader("Content-Type", "text/plain; charset=utf-8");
         resp.body = req.body;
+        RecordRouteMetric("POST /echo", NowMs() - startedMs, resp.statusCode);
         conn.SendHttpResponse(resp);
     });
 
     LOG_INFO("Register route POST /login");
     dispatcher_.Register("POST", "/login", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
         HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
         resp.SetHeader("Content-Type", "application/json");
         auto account = req.Header("x-account");
         auto token = req.Header("x-token");
@@ -272,7 +412,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             resp.statusCode = 400;
             resp.reason = "Bad Request";
             resp.body = "{\"error\":\"missing credentials\"}";
-            conn.SendHttpResponse(resp);
+            sendResponse("POST /login");
             return;
         }
 
@@ -280,7 +420,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             resp.statusCode = 401;
             resp.reason = "Unauthorized";
             resp.body = "{\"error\":\"invalid credential\"}";
-            conn.SendHttpResponse(resp);
+            sendResponse("POST /login");
             return;
         }
 
@@ -291,12 +431,17 @@ void NetBootstrap::RegisterBuiltInHandlers() {
         SessionManager::Instance().Register(account, conn.shared_from_this());
 
         resp.body = "{\"status\":\"ok\"}";
-        conn.SendHttpResponse(resp);
+        sendResponse("POST /login");
     });
 
     LOG_INFO("Register route POST /battle");
     dispatcher_.Register("POST", "/battle", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
         HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
         resp.SetHeader("Content-Type", "application/json");
 
         auto account = req.Header("x-account");
@@ -306,7 +451,7 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             resp.statusCode = 400;
             resp.reason = "Bad Request";
             resp.body = "{\"code\":4001,\"error\":\"missing x-account\"}";
-            conn.SendHttpResponse(resp);
+            sendResponse("POST /battle");
             return;
         }
 
@@ -316,255 +461,88 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                 resp.statusCode = 400;
                 resp.reason = "Bad Request";
                 resp.body = "{\"code\":4002,\"error\":\"invalid action\"}";
-                conn.SendHttpResponse(resp);
+                sendResponse("POST /battle");
                 return;
             }
 
             const std::string action = payload["action"].get<std::string>();
-            if (action != "start" && action != "attack" && action != "auto" && action != "end") {
+            if (action != "auto") {
                 resp.statusCode = 400;
                 resp.reason = "Bad Request";
-                resp.body = "{\"code\":4003,\"error\":\"unsupported action\"}";
-                conn.SendHttpResponse(resp);
+                resp.body = "{\"code\":4003,\"error\":\"unsupported action, only auto is allowed\"}";
+                sendResponse("POST /battle");
                 return;
             }
 
-            if (action == "start") {
-                auto runtime = std::make_shared<BattleRuntime>();
-                runtime->battleId = NewBattleId(account);
-                runtime->account = account;
-
-                runtime->user = std::make_unique<Player>(1, account + "_user");
-                runtime->enemy = std::make_unique<Player>(2, account + "_enemy");
-
-                auto allIds = CharacterConfig::instance().getAllIds();
-                if (allIds.size() < 2) {
-                    resp.statusCode = 500;
-                    resp.reason = "Internal Server Error";
-                    resp.body = "{\"code\":5001,\"error\":\"character config not ready\"}";
-                    conn.SendHttpResponse(resp);
-                    return;
-                }
-
-                auto userTeam = ParseTeamIds(payload, "user_team");
-                auto enemyTeam = ParseTeamIds(payload, "enemy_team");
-
-                if (userTeam.empty()) {
-                    userTeam = BuildDefaultTeam(allIds, 0);
-                }
-                if (enemyTeam.empty()) {
-                    enemyTeam = BuildDefaultTeam(allIds, 1);
-                }
-
-                std::string err;
-                if (!FillPlayerWithCharacters(*runtime->user, userTeam, err) ||
-                    !FillPlayerWithCharacters(*runtime->enemy, enemyTeam, err)) {
-                    resp.statusCode = 400;
-                    resp.reason = "Bad Request";
-                    resp.body = "{\"code\":4006,\"error\":\"invalid battle team\"}";
-                    conn.SendHttpResponse(resp);
-                    return;
-                }
-
-                runtime->manager = std::make_unique<BattleManager>(runtime->user.get(), runtime->enemy.get());
-                runtime->updatedAtMs = NowMs();
-
-                const std::string createdBattleId = runtime->battleId;
-                {
-                    std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-                    gBattleSessions[createdBattleId] = runtime;
-                }
-
-                nlohmann::json out = {
-                    {"code", 0},
-                    {"status", "ok"},
-                    {"module", "battle"},
-                    {"action", "start"},
-                    {"session", SessionToJson(*runtime)},
-                    {"battle_logs", SessionLogsToJson(*runtime)},
-                };
-                resp.body = out.dump();
-                conn.SendHttpResponse(resp);
+            auto allIds = CharacterConfig::instance().getAllIds();
+            if (allIds.size() < 2) {
+                resp.statusCode = 500;
+                resp.reason = "Internal Server Error";
+                resp.body = "{\"code\":5001,\"error\":\"character config not ready\"}";
+                sendResponse("POST /battle");
                 return;
             }
 
-            const bool hasBattleId = payload.contains("battle_id") && payload["battle_id"].is_string() && !payload["battle_id"].get<std::string>().empty();
-            if (!hasBattleId && action == "attack") {
-                static thread_local std::mt19937 rng(std::random_device{}());
-                std::uniform_int_distribution<int> playerDist(12, 20);
-                std::uniform_int_distribution<int> enemyDist(8, 15);
-                int playerDamage = playerDist(rng);
-                int enemyDamage = enemyDist(rng);
-
-                nlohmann::json out = {
-                    {"code", 0},
-                    {"status", "ok"},
-                    {"module", "battle"},
-                    {"action", "attack"},
-                    {"mode", "stateless"},
-                    {"event", {
-                        {"player_damage", playerDamage},
-                        {"enemy_damage", enemyDamage}
-                    }},
-                    {"message", "no battle_id, fallback to stateless simulation"},
-                };
-                resp.body = out.dump();
-                conn.SendHttpResponse(resp);
-                return;
+            auto userTeam = ParseTeamIds(payload, "user_team");
+            if (userTeam.empty()) {
+                userTeam = ParseTeamConfigIds(payload, "user_generals");
             }
 
-            if (!hasBattleId) {
+            auto enemyTeam = ParseTeamIds(payload, "enemy_team");
+            if (enemyTeam.empty()) {
+                enemyTeam = ParseTeamConfigIds(payload, "enemy_generals");
+            }
+
+            if (userTeam.empty()) {
+                userTeam = BuildDefaultTeam(allIds, 0);
+            }
+            if (enemyTeam.empty()) {
+                enemyTeam = BuildDefaultTeam(allIds, 1);
+            }
+
+            Player user(1, account + "_user");
+            Player enemy(2, account + "_enemy");
+
+            std::string err;
+            if (!FillPlayerWithCharacters(user, userTeam, err) ||
+                !FillPlayerWithCharacters(enemy, enemyTeam, err)) {
                 resp.statusCode = 400;
                 resp.reason = "Bad Request";
-                resp.body = "{\"code\":4005,\"error\":\"missing battle_id\"}";
-                conn.SendHttpResponse(resp);
+                resp.body = "{\"code\":4006,\"error\":\"invalid battle team\"}";
+                sendResponse("POST /battle");
                 return;
             }
 
-            const std::string battleId = payload["battle_id"].get<std::string>();
-            std::shared_ptr<BattleRuntime> sessionPtr;
+            BattleManager manager(&user, &enemy);
+            BattleManager::Result result = manager.runBattle();
+            std::string resultText = ToBattleResultString(result);
+            std::string battleId = NewBattleId(account);
+            nlohmann::json damageBoard = BuildDamageBoard(manager);
 
-            {
-                std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-                auto it = gBattleSessions.find(battleId);
-                if (it == gBattleSessions.end() || !it->second) {
-                    resp.statusCode = 404;
-                    resp.reason = "Not Found";
-                    resp.body = "{\"code\":4041,\"error\":\"battle not found\"}";
-                    conn.SendHttpResponse(resp);
-                    return;
-                }
-                sessionPtr = it->second;
-            }
+            nlohmann::json out = {
+                {"code", 0},
+                {"status", "ok"},
+                {"module", "battle"},
+                {"action", "auto"},
+                {"message", "auto battle completed"},
+                {"session", BuildBattleSummary(battleId, account, manager, resultText)},
+                {"damage_board", damageBoard},
+                {"damage_summary", BuildDamageSummary(damageBoard)},
+                {"battle_logs", BattleLogsToJson(manager)},
+                {"team_config", {
+                    {"user_team", userTeam},
+                    {"enemy_team", enemyTeam},
+                }},
+                {"loadout", payload.contains("loadout") && payload["loadout"].is_object() ? payload["loadout"] : nlohmann::json::object()},
+            };
 
-            bool needEraseSession = false;
-            {
-                std::lock_guard<std::mutex> sessionLock(sessionPtr->mutex);
-                BattleRuntime& session = *sessionPtr;
-                if (session.account != account) {
-                    resp.statusCode = 403;
-                    resp.reason = "Forbidden";
-                    resp.body = "{\"code\":4031,\"error\":\"battle does not belong to account\"}";
-                    conn.SendHttpResponse(resp);
-                    return;
-                }
-
-                if (action == "end") {
-                    session.ended = true;
-                    if (session.result == "ongoing") {
-                        session.result = "ended_by_client";
-                    }
-                    session.updatedAtMs = NowMs();
-
-                    nlohmann::json out = {
-                        {"code", 0},
-                        {"status", "ok"},
-                        {"module", "battle"},
-                        {"action", "end"},
-                        {"session", SessionToJson(session)},
-                        {"battle_logs", SessionLogsToJson(session)},
-                    };
-                    resp.body = out.dump();
-                    needEraseSession = true;
-                    conn.SendHttpResponse(resp);
-                    goto battle_handler_exit;
-                }
-
-                if (session.ended) {
-                    resp.statusCode = 409;
-                    resp.reason = "Conflict";
-                    resp.body = "{\"code\":4091,\"error\":\"battle already ended\"}";
-                    conn.SendHttpResponse(resp);
-                    goto battle_handler_exit;
-                }
-
-                if (action == "auto") {
-                    if (!session.manager) {
-                        resp.statusCode = 500;
-                        resp.reason = "Internal Server Error";
-                        resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
-                        conn.SendHttpResponse(resp);
-                        goto battle_handler_exit;
-                    }
-
-                    BattleManager::Result result = session.manager->runBattle();
-                    session.result = ToBattleResultString(result);
-                    session.ended = true;
-                    session.updatedAtMs = NowMs();
-
-                    std::vector<nlohmann::json> events;
-                    events.push_back({
-                        {"type", "auto_battle_executed"},
-                        {"round", session.manager->getRound()},
-                        {"result", session.result},
-                    });
-
-                    nlohmann::json out = {
-                        {"code", 0},
-                        {"status", "ok"},
-                        {"module", "battle"},
-                        {"action", "auto"},
-                        {"events", events},
-                        {"session", SessionToJson(session)},
-                        {"battle_logs", SessionLogsToJson(session)},
-                    };
-                    resp.body = out.dump();
-                    conn.SendHttpResponse(resp);
-                    goto battle_handler_exit;
-                }
-
-                static thread_local std::mt19937 rng(std::random_device{}());
-                (void)rng;
-
-                if (!session.manager) {
-                    resp.statusCode = 500;
-                    resp.reason = "Internal Server Error";
-                    resp.body = "{\"code\":5003,\"error\":\"battle manager not initialized\"}";
-                    conn.SendHttpResponse(resp);
-                    goto battle_handler_exit;
-                }
-
-                BattleManager::Result result = session.manager->executeRound();
-                session.result = ToBattleResultString(result);
-                if (result != BattleManager::Result::ONGOING) {
-                    session.ended = true;
-                }
-
-                session.updatedAtMs = NowMs();
-
-                std::vector<nlohmann::json> events;
-                events.push_back({
-                    {"type", "round_executed"},
-                    {"round", session.manager->getRound()},
-                    {"result", session.result},
-                });
-
-                nlohmann::json out = {
-                    {"code", 0},
-                    {"status", "ok"},
-                    {"module", "battle"},
-                    {"action", "attack"},
-                    {"events", events},
-                    {"session", SessionToJson(session)},
-                    {"battle_logs", SessionLogsToJson(session)},
-                };
-                resp.body = out.dump();
-                conn.SendHttpResponse(resp);
-            }
-
-battle_handler_exit:
-            if (needEraseSession) {
-                std::lock_guard<std::mutex> lock(gBattleSessionMutex);
-                auto it = gBattleSessions.find(battleId);
-                if (it != gBattleSessions.end() && it->second == sessionPtr) {
-                    gBattleSessions.erase(it);
-                }
-            }
+            resp.body = out.dump();
+            sendResponse("POST /battle");
         } catch (const std::exception&) {
             resp.statusCode = 400;
             resp.reason = "Bad Request";
             resp.body = "{\"code\":4000,\"error\":\"invalid json\"}";
-            conn.SendHttpResponse(resp);
+            sendResponse("POST /battle");
         }
     });
 }

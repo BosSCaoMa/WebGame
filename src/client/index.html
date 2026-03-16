@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebGame 战术指挥台</title>
+  <link rel="stylesheet" href="/styles.css?v=20260316a" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <main class="app">
+    <header class="hero panel">
+      <div>
+        <p class="sub-title">WebGame Tactical Console</p>
+        <h1>战术指挥台 · Project Showcase</h1>
+        <p class="hint">面向项目首页展示的战斗演示界面：武将编队、道具装备策略、自动战斗回放与战报可视化。</p>
+      </div>
+      <div class="hero-right">
+        <span id="serverStatus" class="badge badge-warn">服务未检测</span>
+        <span id="accountBadge" class="badge">未登录</span>
+      </div>
+    </header>
+
+    <section class="panel" id="loginPanel">
+      <div class="panel-headline">
+        <h2>账号登录</h2>
+        <span class="tag">API: POST /api/login</span>
+      </div>
+      <form id="loginForm" class="login-grid">
+        <label>
+          账号
+          <input id="accountInput" name="account" type="text" placeholder="例如: user1" required />
+        </label>
+        <label>
+          Token
+          <input id="tokenInput" name="token" type="password" placeholder="例如: password1" required />
+        </label>
+        <button id="loginBtn" type="submit">进入战术台</button>
+      </form>
+    </section>
+
+    <section class="panel hidden" id="gamePanel">
+      <div class="panel-headline">
+        <h2>自动战斗配置</h2>
+        <div class="row">
+          <button id="logoutBtn" type="button" class="btn-ghost">退出登录</button>
+          <button id="runAutoBtn" type="button">开始自动战斗</button>
+        </div>
+      </div>
+
+      <section class="battle-stage">
+        <div class="team-preview team-preview-left">
+          <p>我方阵容预览</p>
+          <div id="userTeamPreview" class="preview-cards"></div>
+        </div>
+        <div class="versus">VS</div>
+        <div class="team-preview team-preview-right">
+          <p>敌方阵容预览</p>
+          <div id="enemyTeamPreview" class="preview-cards"></div>
+        </div>
+      </section>
+
+      <div class="config-grid">
+        <article class="card">
+          <h3>我方阵容</h3>
+          <div id="userTeamSlots" class="slot-list"></div>
+          <label>
+            战前道具
+            <select id="userItemSelect"></select>
+          </label>
+          <label>
+            推荐装备
+            <select id="userEquipSelect"></select>
+          </label>
+        </article>
+
+        <article class="card">
+          <h3>敌方阵容</h3>
+          <div id="enemyTeamSlots" class="slot-list"></div>
+          <label>
+            战前道具
+            <select id="enemyItemSelect"></select>
+          </label>
+          <label>
+            推荐装备
+            <select id="enemyEquipSelect"></select>
+          </label>
+        </article>
+
+        <article class="card">
+          <h3>战役章节</h3>
+          <label>
+            章节选择
+            <select id="scenarioSelect"></select>
+          </label>
+          <p id="scenarioDesc" class="hint">请选择章节</p>
+          <h4>套装加成预览</h4>
+          <ul id="setBonusPreview" class="list-compact"></ul>
+        </article>
+
+        <article class="card">
+          <h3>数据总览</h3>
+          <p class="hint">来源：<code>item_samples.json</code></p>
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <ul id="dataPreview" class="list-compact"></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="resultPanel">
+      <div class="panel-headline">
+        <h2>最近战斗摘要</h2>
+        <span id="resultBadge" class="badge">未开始</span>
+      </div>
+      <div id="resultHeadline" class="result-headline">等待战斗开始...</div>
+      <div class="status-grid">
+        <div><span>回合数</span><strong id="round">0</strong></div>
+        <div><span>我方总伤害</span><strong id="userTotalDamage">0</strong></div>
+        <div><span>敌方总伤害</span><strong id="enemyTotalDamage">0</strong></div>
+        <div><span>MVP</span><strong id="mvpName">-</strong></div>
+        <div><span>MVP伤害</span><strong id="mvpDamage">0</strong></div>
+        <div><span>对局结果</span><strong id="battleResult">-</strong></div>
+      </div>
+    </section>
+
+    <div id="battleResultModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-hidden="true">
+      <section id="battleResultModalCard" class="modal-card">
+        <div class="panel-headline">
+          <h2 id="modalResultTitle">战斗结束</h2>
+          <button id="closeResultModalBtn" type="button" class="btn-ghost">关闭</button>
+        </div>
+        <div class="result-headline" id="modalResultHeadline">等待战斗...</div>
+
+        <h3>伤害榜</h3>
+        <div id="damageSideTabs" class="damage-tabs" role="tablist" aria-label="伤害榜分组">
+          <button type="button" class="damage-tab is-active" data-side="user" role="tab" aria-selected="true">我方</button>
+          <button type="button" class="damage-tab" data-side="enemy" role="tab" aria-selected="false">敌方</button>
+        </div>
+        <ul id="damageBoardList" class="damage-list"></ul>
+
+        <div class="row">
+          <button id="toggleBattleProcessBtn" type="button" class="btn-ghost">查看战斗过程</button>
+        </div>
+        <section id="battleProcessSection" class="hidden">
+          <h3>战斗过程</h3>
+          <ul id="battleLogs" class="log-list"></ul>
+        </section>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h3>调试回包</h3>
+      <pre id="feedback" class="feedback">等待操作...</pre>
+    </section>
+  </main>
+
+  <script src="/app.js?v=20260316a" defer></script>
+</body>
+</html>
