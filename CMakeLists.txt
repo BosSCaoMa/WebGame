@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(WebGame LANGUAGES CXX)
 
 include(CTest)
+find_package(Protobuf REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,8 +27,16 @@ file(GLOB_RECURSE GAMECORE_SOURCES CONFIGURE_DEPENDS
 )
 list(FILTER GAMECORE_SOURCES EXCLUDE REGEX "src/network/ConnectProc\\.cpp$")
 
+set(PLAYER_PROTO_FILE "${CMAKE_CURRENT_SOURCE_DIR}/proto/player.proto")
+set(PROTO_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${PROTO_GEN_DIR}")
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS "${PLAYER_PROTO_FILE}")
+set_source_files_properties(${PROTO_SRCS} ${PROTO_HDRS} PROPERTIES GENERATED TRUE)
+
 add_library(WebGameCore ${GAMECORE_SOURCES})
+target_sources(WebGameCore PRIVATE ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(WebGameCore PUBLIC LogM)
+target_link_libraries(WebGameCore PUBLIC protobuf::libprotobuf)
 
 set(PROJECT_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -48,6 +57,7 @@ endforeach()
 list(REMOVE_DUPLICATES PROJECT_INCLUDE_DIRS)
 
 target_include_directories(WebGameCore PUBLIC ${PROJECT_INCLUDE_DIRS})
+target_include_directories(WebGameCore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB_RECURSE ALL_HEADERS 
   LIST_DIRECTORIES false

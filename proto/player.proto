@@ -1,0 +1,299 @@
+syntax = "proto3";
+
+package webgame.player.v1;
+
+option cc_enable_arenas = true;
+
+enum PlayerAttrType {
+  PLAYER_ATTR_TYPE_UNSPECIFIED = 0;
+  PLAYER_ATTR_TYPE_STAMINA = 1;
+  PLAYER_ATTR_TYPE_ENERGY = 2;
+  PLAYER_ATTR_TYPE_EXP = 3;
+}
+
+enum CurrencyType {
+  CURRENCY_TYPE_UNKNOWN = 0;
+  CURRENCY_TYPE_SOFT = 1;
+  CURRENCY_TYPE_PREMIUM = 2;
+  CURRENCY_TYPE_BOUND_PREMIUM = 3;
+  CURRENCY_TYPE_TOKEN = 4;
+}
+
+enum QualityType {
+  QUALITY_TYPE_UNSPECIFIED = 0;
+  QUALITY_TYPE_WHITE = 1;
+  QUALITY_TYPE_GREEN = 2;
+  QUALITY_TYPE_BLUE = 3;
+  QUALITY_TYPE_PURPLE = 4;
+  QUALITY_TYPE_ORANGE = 5;
+  QUALITY_TYPE_RED = 6;
+  QUALITY_TYPE_GOLD = 7;
+}
+
+enum Position {
+  POSITION_UNSPECIFIED = 0;
+  POSITION_WARRIOR = 1;
+  POSITION_MAGE = 2;
+  POSITION_TANK = 3;
+  POSITION_HEALER = 4;
+  POSITION_ASSASSIN = 5;
+}
+
+enum SkillTrigger {
+  SKILL_TRIGGER_UNSPECIFIED = 0;
+  SKILL_TRIGGER_NORMAL_ATTACK = 1;
+  SKILL_TRIGGER_RAGE_SKILL = 2;
+  SKILL_TRIGGER_ON_SAME_CAMP = 3;
+  SKILL_TRIGGER_BATTLE_START = 4;
+  SKILL_TRIGGER_ROUND_START = 5;
+  SKILL_TRIGGER_ROUND_END = 6;
+  SKILL_TRIGGER_TURN_START = 7;
+  SKILL_TRIGGER_TURN_END = 8;
+  SKILL_TRIGGER_ROUND_ODD = 9;
+  SKILL_TRIGGER_ROUND_EVEN = 10;
+  SKILL_TRIGGER_ROUND_MULTIPLE_OF_FIVE = 11;
+  SKILL_TRIGGER_ROUND_TEN = 12;
+  SKILL_TRIGGER_ON_HIT = 13;
+  SKILL_TRIGGER_ON_CONTROL = 14;
+  SKILL_TRIGGER_ON_KILL = 15;
+  SKILL_TRIGGER_ON_DEATH = 16;
+  SKILL_TRIGGER_NONE = 17;
+}
+
+enum EquipmentType {
+  EQUIPMENT_TYPE_UNSPECIFIED = 0;
+  EQUIPMENT_TYPE_WEAPON = 1;
+  EQUIPMENT_TYPE_ARMOR = 2;
+  EQUIPMENT_TYPE_HELMET = 3;
+  EQUIPMENT_TYPE_BOOTS = 4;
+  EQUIPMENT_TYPE_STEED = 5;
+  EQUIPMENT_TYPE_TALLY = 6;
+  EQUIPMENT_TYPE_TREASURE = 7;
+  EQUIPMENT_TYPE_FAMOUS = 8;
+}
+
+enum TargetType {
+  TARGET_TYPE_UNSPECIFIED = 0;
+  TARGET_TYPE_SELF = 1;
+  TARGET_TYPE_ALLY_ALL = 2;
+  TARGET_TYPE_ENEMY_SINGLE = 3;
+  TARGET_TYPE_ENEMY_COL = 4;
+  TARGET_TYPE_ENEMY_ALL = 5;
+  TARGET_TYPE_ALLY_FRONT_ROW = 6;
+  TARGET_TYPE_ALLY_BACK_ROW = 7;
+  TARGET_TYPE_ENEMY_FRONT_ROW = 8;
+  TARGET_TYPE_ENEMY_BACK_ROW = 9;
+  TARGET_TYPE_ALLY_ATK_TOP1 = 10;
+  TARGET_TYPE_ALLY_ATK_TOP2 = 11;
+  TARGET_TYPE_ALLY_ATK_TOP3 = 12;
+  TARGET_TYPE_ENEMY_ATK_TOP1 = 13;
+  TARGET_TYPE_ENEMY_ATK_TOP2 = 14;
+  TARGET_TYPE_ENEMY_ATK_TOP3 = 15;
+  TARGET_TYPE_ALLY_HP_LOW1 = 16;
+  TARGET_TYPE_ALLY_HP_LOW2 = 17;
+  TARGET_TYPE_ALLY_HP_LOW3 = 18;
+  TARGET_TYPE_ENEMY_HP_LOW1 = 19;
+  TARGET_TYPE_ENEMY_HP_LOW2 = 20;
+  TARGET_TYPE_ENEMY_HP_LOW3 = 21;
+  TARGET_TYPE_ALLY_RANDOM_1 = 22;
+  TARGET_TYPE_ALLY_RANDOM_2 = 23;
+  TARGET_TYPE_ALLY_RANDOM_3 = 24;
+  TARGET_TYPE_ENEMY_RANDOM_1 = 25;
+  TARGET_TYPE_ENEMY_RANDOM_2 = 26;
+  TARGET_TYPE_ENEMY_RANDOM_3 = 27;
+}
+
+enum ValueSource {
+  VALUE_SOURCE_UNSPECIFIED = 0;
+  VALUE_SOURCE_FIXED = 1;
+  VALUE_SOURCE_ATK = 2;
+  VALUE_SOURCE_DEF = 3;
+  VALUE_SOURCE_MAX_HP = 4;
+  VALUE_SOURCE_CUR_HP = 5;
+  VALUE_SOURCE_LOST_HP = 6;
+}
+
+enum ValueOwner {
+  VALUE_OWNER_UNSPECIFIED = 0;
+  VALUE_OWNER_CASTER = 1;
+  VALUE_OWNER_TARGET = 2;
+}
+
+enum ValueScale {
+  VALUE_SCALE_UNSPECIFIED = 0;
+  VALUE_SCALE_ABSOLUTE = 1;
+  VALUE_SCALE_PERCENT = 2;
+}
+
+enum EffectType {
+  EFFECT_TYPE_UNSPECIFIED = 0;
+  EFFECT_TYPE_DAMAGE = 1;
+  EFFECT_TYPE_PIERCE = 2;
+  EFFECT_TYPE_TRUE_DAMAGE = 3;
+  EFFECT_TYPE_HEAL = 4;
+  EFFECT_TYPE_RAGE_CHANGE = 5;
+  EFFECT_TYPE_DIVINE_POWER = 6;
+  EFFECT_TYPE_SHIELD = 7;
+  EFFECT_TYPE_BARRIER = 8;
+  EFFECT_TYPE_BUFF_MAX_HP = 9;
+  EFFECT_TYPE_BUFF_ATK = 10;
+  EFFECT_TYPE_BUFF_DEF = 11;
+  EFFECT_TYPE_BUFF_SPEED = 12;
+  EFFECT_TYPE_BUFF_CRIT_RATE = 13;
+  EFFECT_TYPE_BUFF_CRIT_RESIST = 14;
+  EFFECT_TYPE_BUFF_HIT_RATE = 15;
+  EFFECT_TYPE_BUFF_DODGE_RATE = 16;
+  EFFECT_TYPE_BUFF_REGEN = 17;
+  EFFECT_TYPE_STUN = 18;
+  EFFECT_TYPE_FREEZE = 19;
+  EFFECT_TYPE_SILENCE = 20;
+  EFFECT_TYPE_TAUNT = 21;
+  EFFECT_TYPE_INJURY = 22;
+  EFFECT_TYPE_POISON = 23;
+  EFFECT_TYPE_BURN = 24;
+  EFFECT_TYPE_BLEED = 25;
+  EFFECT_TYPE_CURSE = 26;
+  EFFECT_TYPE_LOCK_BLEED = 27;
+  EFFECT_TYPE_REVIVE = 28;
+  EFFECT_TYPE_DISPEL = 29;
+  EFFECT_TYPE_CLEANSE = 30;
+  EFFECT_TYPE_IMMUNITY = 31;
+  EFFECT_TYPE_INVINCIBLE = 32;
+  EFFECT_TYPE_TRANSFER_DEBUFF = 33;
+  EFFECT_TYPE_MARK_HEAL = 34;
+  EFFECT_TYPE_MARK_DAMAGE = 35;
+  EFFECT_TYPE_MARK_KILL = 36;
+  EFFECT_TYPE_MARK_PROTECT = 37;
+}
+
+message BattleAttr {
+  int64 hp = 1;
+  int64 max_hp = 2;
+  int64 atk = 3;
+  int64 def = 4;
+  int64 speed = 5;
+
+  int32 crit_rate = 6;
+  int32 crit_damage = 7;
+  int32 crit_resist = 8;
+  int32 hit_rate = 9;
+  int32 dodge_rate = 10;
+  int32 rage = 11;
+
+  int32 damage_bonus = 12;
+  int32 damage_reduction = 13;
+  int32 skill_damage = 14;
+  int32 lifesteal = 15;
+  int32 counter_rate = 16;
+  int32 multi_hit_rate = 17;
+  int32 heal_bonus = 18;
+
+  int32 burn_resist = 19;
+  int32 freeze_resist = 20;
+  int32 stun_resist = 21;
+  int32 silence_resist = 22;
+  int32 poison_resist = 23;
+  int32 taunt_resist = 24;
+  int32 injury_resist = 25;
+  int32 bleed_resist = 26;
+  int32 curse_resist = 27;
+}
+
+message ValueExpr {
+  ValueSource source = 1;
+  ValueOwner owner = 2;
+  ValueScale scale = 3;
+  int64 value = 4;
+}
+
+message SkillEffect {
+  TargetType target = 1;
+  EffectType effect = 2;
+  ValueExpr value_expr = 3;
+  int32 duration = 4;
+  int32 chance = 5;
+  bool can_overlay = 6;
+}
+
+message Skill {
+  int32 id = 1;
+  string name = 2;
+  string description = 3;
+  SkillTrigger trigger = 4;
+  repeated SkillEffect effects = 5;
+}
+
+message Equipment {
+  int32 id = 1;
+  string name = 2;
+  EquipmentType type = 3;
+  QualityType quality = 4;
+  BattleAttr base_attrs = 5;
+  int32 skill_id = 6;
+  int32 set_id = 7;
+}
+
+message ItemStack {
+  int64 guid = 1;
+  int32 item_template_id = 2;
+  int32 count = 3;
+  bool bound = 4;
+  bool locked = 5;
+}
+
+message Inventory {
+  uint32 max_item_slots = 1;
+  uint32 max_equip_slots = 2;
+  int64 next_guid = 3;
+  repeated ItemStack items = 4;
+  repeated Equipment equipments = 5;
+}
+
+message Character {
+  int32 id = 1;
+  int32 relid = 2;
+  string name = 3;
+  QualityType quality = 4;
+  Position position = 5;
+
+  string base_name = 6;
+  int64 exp = 7;
+  int64 exp_max = 8;
+  int32 breakthrough = 9;
+  int32 level = 10;
+  int32 star = 11;
+
+  BattleAttr origin_attr = 12;
+  BattleAttr base_attr = 13;
+
+  map<int32, SkillList> skills_by_trigger = 14;
+  map<int32, Equipment> equipments_by_type = 15;
+}
+
+message SkillList {
+  repeated Skill skills = 1;
+}
+
+message Player {
+  uint32 schema_version = 1;
+
+  int32 id = 2;
+  string name = 3;
+  int32 level = 4;
+  int32 vip_level = 5;
+
+  map<int32, int32> attributes = 6;
+  map<int32, int64> resources = 7;
+
+  int32 main_character_id = 8;
+  map<int32, Character> characters = 9;
+  repeated int32 battle_team = 10;
+  uint64 combat_power = 11;
+
+  Inventory inventory = 12;
+
+  map<int32, int64> currency_wallet = 13;
+  map<int32, int32> shop_purchase_history = 14;
+
+  reserved 15, 16, 17, 18, 19;
+}

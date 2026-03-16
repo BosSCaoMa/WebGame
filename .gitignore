@@ -2,3 +2,4 @@
 build
 build-tests
 test/benchmarks/
+test/benchmarks_remote

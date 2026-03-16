@@ -2,7 +2,7 @@
   "flow_mode": "auto",
   "stable_success_threshold": 99.9,
   "lowlat_p95_threshold_ms": 10000,
-  "total_runs": 24,
+  "total_runs": 32,
   "rows": [
     {
       "timestamp": "20260306_211119",
@@ -96,6 +96,45 @@
       "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_002318"
     },
     {
+      "timestamp": "20260311_193600",
+      "flow_mode": "auto",
+      "flow_users": 400,
+      "concurrency": 40,
+      "success_rate_percent": 100.0,
+      "flow_rps": 21.66,
+      "failed_flows": 0,
+      "p95": 2104.0,
+      "avg": 1777.562,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193600/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193600"
+    },
+    {
+      "timestamp": "20260311_193859",
+      "flow_mode": "auto",
+      "flow_users": 400,
+      "concurrency": 40,
+      "success_rate_percent": 98.0,
+      "flow_rps": 22.62,
+      "failed_flows": 8,
+      "p95": 2061.0,
+      "avg": 1697.855,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193859/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193859"
+    },
+    {
+      "timestamp": "20260311_195434",
+      "flow_mode": "auto",
+      "flow_users": 400,
+      "concurrency": 40,
+      "success_rate_percent": 100.0,
+      "flow_rps": 18.49,
+      "failed_flows": 0,
+      "p95": 2793.0,
+      "avg": 2067.162,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_195434/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_195434"
+    },
+    {
       "timestamp": "20260307_002338",
       "flow_mode": "auto",
       "flow_users": 800,
@@ -120,6 +159,45 @@
       "avg": 4075.42,
       "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010510/summary.json",
       "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010510"
+    },
+    {
+      "timestamp": "20260311_193620",
+      "flow_mode": "auto",
+      "flow_users": 800,
+      "concurrency": 80,
+      "success_rate_percent": 100.0,
+      "flow_rps": 21.64,
+      "failed_flows": 0,
+      "p95": 4102.0,
+      "avg": 3519.256,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193620/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193620"
+    },
+    {
+      "timestamp": "20260311_193919",
+      "flow_mode": "auto",
+      "flow_users": 800,
+      "concurrency": 80,
+      "success_rate_percent": 100.0,
+      "flow_rps": 21.75,
+      "failed_flows": 0,
+      "p95": 4097.0,
+      "avg": 3508.411,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193919/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193919"
+    },
+    {
+      "timestamp": "20260311_195457",
+      "flow_mode": "auto",
+      "flow_users": 800,
+      "concurrency": 80,
+      "success_rate_percent": 100.0,
+      "flow_rps": 18.51,
+      "failed_flows": 0,
+      "p95": 5554.0,
+      "avg": 4081.955,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_195457/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_195457"
     },
     {
       "timestamp": "20260306_235540",
@@ -237,6 +315,32 @@
       "avg": 6143.429,
       "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010555/summary.json",
       "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260307_010555"
+    },
+    {
+      "timestamp": "20260311_193659",
+      "flow_mode": "auto",
+      "flow_users": 1200,
+      "concurrency": 120,
+      "success_rate_percent": 100.0,
+      "flow_rps": 21.51,
+      "failed_flows": 0,
+      "p95": 6118.0,
+      "avg": 5218.877,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193659/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193659"
+    },
+    {
+      "timestamp": "20260311_193957",
+      "flow_mode": "auto",
+      "flow_users": 1200,
+      "concurrency": 120,
+      "success_rate_percent": 100.0,
+      "flow_rps": 21.27,
+      "failed_flows": 0,
+      "p95": 6179.0,
+      "avg": 5295.905,
+      "summary_json": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193957/summary.json",
+      "result_dir": "/home/ubuntu/code/WebGame/test/benchmarks/battle_flow/battle_flow_bench_20260311_193957"
     },
     {
       "timestamp": "20260307_002514",
