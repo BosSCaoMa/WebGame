@@ -7,6 +7,7 @@
 #include "EventLoopGroup.h"
 #include "LoginAcceptor.h"
 #include "Player.h"
+#include "ProfileStore.h"
 #include "SessionManager.h"
 #include "SkillConfig.h"
 #include "TcpConnection.h"
@@ -222,6 +223,93 @@ nlohmann::json BuildDamageSummary(const nlohmann::json& board) {
     };
 }
 
+nlohmann::json BuildProfileJson(const server::PlayerProfile& profile) {
+    return {
+        {"level", profile.level},
+        {"exp", profile.exp},
+        {"gold", profile.gold},
+        {"diamond", profile.diamond},
+    };
+}
+
+nlohmann::json BuildBattleRecordJson(const server::BattleRecord& record) {
+    return {
+        {"battle_id", record.battleId},
+        {"result", record.result},
+        {"round", record.round},
+        {"user_total_damage", record.userTotalDamage},
+        {"enemy_total_damage", record.enemyTotalDamage},
+        {"reward", {
+            {"exp", record.rewardExp},
+            {"gold", record.rewardGold},
+            {"diamond", record.rewardDiamond},
+        }},
+        {"created_at_ms", record.createdAtMs},
+    };
+}
+
+nlohmann::json BuildLeaderboardEntryJson(const server::LeaderboardEntry& entry, int rank) {
+    return {
+        {"rank", rank},
+        {"account", entry.account},
+        {"level", entry.level},
+        {"exp", entry.exp},
+        {"gold", entry.gold},
+        {"diamond", entry.diamond},
+    };
+}
+
+nlohmann::json BuildDailyStateJson(const server::DailyState& state) {
+    return {
+        {"day_key", state.dayKey},
+        {"signed_in", state.signedIn},
+        {"battle_count", state.battleCount},
+        {"task_claimed", state.taskClaimed},
+        {"task_target", 3},
+    };
+}
+
+nlohmann::json BuildRewardJson(const server::RewardDelta& reward) {
+    return {
+        {"exp", reward.exp},
+        {"gold", reward.gold},
+        {"diamond", reward.diamond},
+    };
+}
+
+server::BattleReward BuildBattleReward(BattleManager::Result result, int round) {
+    server::BattleReward reward;
+    const int safeRound = std::max(round, 1);
+
+    switch (result) {
+        case BattleManager::Result::WIN:
+            reward.exp = 120;
+            reward.gold = 100;
+            reward.diamond = 2;
+            break;
+        case BattleManager::Result::LOSE:
+            reward.exp = 70;
+            reward.gold = 50;
+            reward.diamond = 0;
+            break;
+        case BattleManager::Result::DRAW:
+            reward.exp = 90;
+            reward.gold = 70;
+            reward.diamond = 1;
+            break;
+        case BattleManager::Result::ONGOING:
+        default:
+            reward.exp = 50;
+            reward.gold = 30;
+            reward.diamond = 0;
+            break;
+    }
+
+    reward.exp += static_cast<int64_t>(safeRound) * 8;
+    reward.gold += static_cast<int64_t>(safeRound) * 5;
+    return reward;
+}
+
 int ParsePositiveInt(const nlohmann::json& payload, const char* key, int fallback) {
     if (!payload.contains(key)) {
         return fallback;
@@ -430,8 +518,292 @@ void NetBootstrap::RegisterBuiltInHandlers() {
         ctx->TouchHeartbeat();
         SessionManager::Instance().Register(account, conn.shared_from_this());
 
-        resp.body = "{\"status\":\"ok\"}";
+        auto& store = server::PlayerProfileStore::Instance();
+        const auto profile = store.GetOrCreate(account);
+        resp.body = nlohmann::json({
+            {"status", "ok"},
+            {"profile", BuildProfileJson(profile)},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
         sendResponse("POST /login");
+    });
+
+    LOG_INFO("Register route GET /profile");
+    dispatcher_.Register("GET", "/profile", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        const auto account = req.Header("x-account");
+        const auto token = req.Header("x-token");
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            sendResponse("GET /profile");
+            return;
+        }
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            sendResponse("GET /profile");
+            return;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        const auto profile = store.GetOrCreate(account);
+        resp.body = nlohmann::json({
+            {"status", "ok"},
+            {"account", account},
+            {"profile", BuildProfileJson(profile)},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("GET /profile");
+    });
+
+    LOG_INFO("Register route GET /profile/history");
+    dispatcher_.Register("GET", "/profile/history", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        const auto account = req.Header("x-account");
+        const auto token = req.Header("x-token");
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            sendResponse("GET /profile/history");
+            return;
+        }
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            sendResponse("GET /profile/history");
+            return;
+        }
+
+        int limit = 10;
+        auto limitStr = req.Header("x-limit");
+        if (!limitStr.empty()) {
+            try {
+                limit = std::stoi(limitStr);
+            } catch (...) {
+                limit = 10;
+            }
+        }
+        if (limit < 1) {
+            limit = 1;
+        }
+        if (limit > 50) {
+            limit = 50;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        const auto records = store.GetRecentBattleRecords(account, static_cast<size_t>(limit));
+        nlohmann::json outRecords = nlohmann::json::array();
+        for (const auto& record : records) {
+            outRecords.push_back(BuildBattleRecordJson(record));
+        }
+
+        resp.body = nlohmann::json({
+            {"status", "ok"},
+            {"account", account},
+            {"count", outRecords.size()},
+            {"records", outRecords},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("GET /profile/history");
+    });
+
+    LOG_INFO("Register route GET /leaderboard");
+    dispatcher_.Register("GET", "/leaderboard", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        int limit = 10;
+        auto limitStr = req.Header("x-limit");
+        if (!limitStr.empty()) {
+            try {
+                limit = std::stoi(limitStr);
+            } catch (...) {
+                limit = 10;
+            }
+        }
+        if (limit < 1) {
+            limit = 1;
+        }
+        if (limit > 100) {
+            limit = 100;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        const auto list = store.GetLeaderboard(static_cast<size_t>(limit));
+
+        nlohmann::json ranking = nlohmann::json::array();
+        int rank = 1;
+        for (const auto& entry : list) {
+            ranking.push_back(BuildLeaderboardEntryJson(entry, rank));
+            ++rank;
+        }
+
+        resp.body = nlohmann::json({
+            {"status", "ok"},
+            {"count", ranking.size()},
+            {"ranking", ranking},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("GET /leaderboard");
+    });
+
+    LOG_INFO("Register route GET /daily");
+    dispatcher_.Register("GET", "/daily", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        const auto account = req.Header("x-account");
+        const auto token = req.Header("x-token");
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            sendResponse("GET /daily");
+            return;
+        }
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            sendResponse("GET /daily");
+            return;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        const auto profile = store.GetOrCreate(account);
+        const auto daily = store.GetDailyState(account);
+        resp.body = nlohmann::json({
+            {"status", "ok"},
+            {"account", account},
+            {"profile", BuildProfileJson(profile)},
+            {"daily", BuildDailyStateJson(daily)},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("GET /daily");
+    });
+
+    LOG_INFO("Register route POST /daily/signin");
+    dispatcher_.Register("POST", "/daily/signin", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        const auto account = req.Header("x-account");
+        const auto token = req.Header("x-token");
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            sendResponse("POST /daily/signin");
+            return;
+        }
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            sendResponse("POST /daily/signin");
+            return;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        auto action = store.SignInDaily(account);
+        if (!action.success) {
+            resp.statusCode = 409;
+            resp.reason = "Conflict";
+        }
+        resp.body = nlohmann::json({
+            {"status", action.success ? "ok" : "rejected"},
+            {"message", action.message},
+            {"reward", BuildRewardJson(action.reward)},
+            {"profile", BuildProfileJson(action.profile)},
+            {"daily", BuildDailyStateJson(action.state)},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("POST /daily/signin");
+    });
+
+    LOG_INFO("Register route POST /daily/claim-task");
+    dispatcher_.Register("POST", "/daily/claim-task", [](const HttpRequest& req, TcpConnection& conn) {
+        const uint64_t startedMs = NowMs();
+        HttpResponse resp;
+        auto sendResponse = [&](const char* routeName) {
+            RecordRouteMetric(routeName, NowMs() - startedMs, resp.statusCode);
+            conn.SendHttpResponse(resp);
+        };
+        resp.SetHeader("Content-Type", "application/json");
+
+        const auto account = req.Header("x-account");
+        const auto token = req.Header("x-token");
+        if (account.empty() || token.empty()) {
+            resp.statusCode = 400;
+            resp.reason = "Bad Request";
+            resp.body = "{\"error\":\"missing credentials\"}";
+            sendResponse("POST /daily/claim-task");
+            return;
+        }
+        if (!auth::ValidateCredential(account, token)) {
+            resp.statusCode = 401;
+            resp.reason = "Unauthorized";
+            resp.body = "{\"error\":\"invalid credential\"}";
+            sendResponse("POST /daily/claim-task");
+            return;
+        }
+
+        auto& store = server::PlayerProfileStore::Instance();
+        auto action = store.ClaimDailyTask(account);
+        if (!action.success) {
+            resp.statusCode = 409;
+            resp.reason = "Conflict";
+        }
+        resp.body = nlohmann::json({
+            {"status", action.success ? "ok" : "rejected"},
+            {"message", action.message},
+            {"reward", BuildRewardJson(action.reward)},
+            {"profile", BuildProfileJson(action.profile)},
+            {"daily", BuildDailyStateJson(action.state)},
+            {"storage_backend", store.BackendName()},
+            {"persistent", store.IsPersistent()},
+        }).dump();
+        sendResponse("POST /daily/claim-task");
     });
 
     LOG_INFO("Register route POST /battle");
@@ -518,6 +890,22 @@ void NetBootstrap::RegisterBuiltInHandlers() {
             std::string resultText = ToBattleResultString(result);
             std::string battleId = NewBattleId(account);
             nlohmann::json damageBoard = BuildDamageBoard(manager);
+            nlohmann::json damageSummary = BuildDamageSummary(damageBoard);
+            const auto reward = BuildBattleReward(result, manager.getRound());
+            auto& store = server::PlayerProfileStore::Instance();
+            const auto profileAfter = store.ApplyBattleReward(account, reward);
+            server::BattleRecord battleRecord;
+            battleRecord.battleId = battleId;
+            battleRecord.result = resultText;
+            battleRecord.round = manager.getRound();
+            battleRecord.userTotalDamage = damageSummary.value("user_total", 0LL);
+            battleRecord.enemyTotalDamage = damageSummary.value("enemy_total", 0LL);
+            battleRecord.rewardExp = reward.exp;
+            battleRecord.rewardGold = reward.gold;
+            battleRecord.rewardDiamond = reward.diamond;
+            battleRecord.createdAtMs = NowMs();
+            store.AppendBattleRecord(account, battleRecord);
+            store.AddDailyBattleProgress(account, 1);
 
             nlohmann::json out = {
                 {"code", 0},
@@ -527,8 +915,17 @@ void NetBootstrap::RegisterBuiltInHandlers() {
                 {"message", "auto battle completed"},
                 {"session", BuildBattleSummary(battleId, account, manager, resultText)},
                 {"damage_board", damageBoard},
-                {"damage_summary", BuildDamageSummary(damageBoard)},
+                {"damage_summary", damageSummary},
                 {"battle_logs", BattleLogsToJson(manager)},
+                {"reward", {
+                    {"exp", reward.exp},
+                    {"gold", reward.gold},
+                    {"diamond", reward.diamond},
+                }},
+                {"profile_after", BuildProfileJson(profileAfter)},
+                {"battle_record", BuildBattleRecordJson(battleRecord)},
+                {"storage_backend", store.BackendName()},
+                {"persistent", store.IsPersistent()},
                 {"team_config", {
                     {"user_team", userTeam},
                     {"enemy_team", enemyTeam},

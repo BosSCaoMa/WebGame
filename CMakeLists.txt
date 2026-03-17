@@ -4,6 +4,9 @@ project(WebGame LANGUAGES CXX)
 include(CTest)
 find_package(Protobuf REQUIRED)
 
+find_path(LIBPQ_INCLUDE_DIR libpq-fe.h PATH_SUFFIXES postgresql)
+find_library(LIBPQ_LIBRARY pq)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -37,6 +40,16 @@ add_library(WebGameCore ${GAMECORE_SOURCES})
 target_sources(WebGameCore PRIVATE ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(WebGameCore PUBLIC LogM)
 target_link_libraries(WebGameCore PUBLIC protobuf::libprotobuf)
+
+if(LIBPQ_INCLUDE_DIR AND LIBPQ_LIBRARY)
+  target_include_directories(WebGameCore PUBLIC ${LIBPQ_INCLUDE_DIR})
+  target_link_libraries(WebGameCore PUBLIC ${LIBPQ_LIBRARY})
+  target_compile_definitions(WebGameCore PUBLIC WEBGAME_HAS_LIBPQ=1)
+  message(STATUS "PostgreSQL libpq enabled")
+else()
+  target_compile_definitions(WebGameCore PUBLIC WEBGAME_HAS_LIBPQ=0)
+  message(STATUS "PostgreSQL libpq not found, building with memory fallback")
+endif()
 
 set(PROJECT_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/src"

@@ -23,6 +23,10 @@ const state = {
   lastBattleLogs: [],
   lastDamageBoard: [],
   lastDamageSummary: null,
+  lastDaily: null,
+  lastLeaderboard: [],
+  profile: null,
+  activeView: "home",
   damageSideTab: "user",
   processExpanded: false,
 };
@@ -60,6 +64,10 @@ const els = {
   accountBadge: document.getElementById("accountBadge"),
   loginPanel: document.getElementById("loginPanel"),
   gamePanel: document.getElementById("gamePanel"),
+  topNav: document.getElementById("topNav"),
+  homeView: document.getElementById("homeView"),
+  rankingView: document.getElementById("rankingView"),
+  battleView: document.getElementById("battleView"),
   resultPanel: document.getElementById("resultPanel"),
   battleResultModal: document.getElementById("battleResultModal"),
   battleResultModalCard: document.getElementById("battleResultModalCard"),
@@ -97,8 +105,193 @@ const els = {
   mvpDamage: document.getElementById("mvpDamage"),
   battleResult: document.getElementById("battleResult"),
   battleLogs: document.getElementById("battleLogs"),
+  refreshDailyBtn: document.getElementById("refreshDailyBtn"),
+  dailySigninBtn: document.getElementById("dailySigninBtn"),
+  dailyClaimTaskBtn: document.getElementById("dailyClaimTaskBtn"),
+  dailySignedIn: document.getElementById("dailySignedIn"),
+  dailyBattleCount: document.getElementById("dailyBattleCount"),
+  dailyTaskClaimed: document.getElementById("dailyTaskClaimed"),
+  dailyMessage: document.getElementById("dailyMessage"),
+  refreshLeaderboardBtn: document.getElementById("refreshLeaderboardBtn"),
+  leaderboardList: document.getElementById("leaderboardList"),
+  profileBackendTag: document.getElementById("profileBackendTag"),
+  profileLevel: document.getElementById("profileLevel"),
+  profileExp: document.getElementById("profileExp"),
+  profileGold: document.getElementById("profileGold"),
+  profileDiamond: document.getElementById("profileDiamond"),
   feedback: document.getElementById("feedback"),
 };
+
+function setActiveView(viewName) {
+  state.activeView = ["home", "ranking", "battle"].includes(viewName) ? viewName : "home";
+  const viewMap = {
+    home: els.homeView,
+    ranking: els.rankingView,
+    battle: els.battleView,
+  };
+  Object.entries(viewMap).forEach(([name, element]) => {
+    if (!element) {
+      return;
+    }
+    element.classList.toggle("hidden", name !== state.activeView);
+  });
+
+  const navButtons = els.topNav?.querySelectorAll(".top-nav-btn") || [];
+  navButtons.forEach((button) => {
+    const isActive = button.dataset.view === state.activeView;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+}
+
+function renderProfile(profile, backendName) {
+  const data = profile && typeof profile === "object" ? profile : null;
+  if (els.profileLevel) {
+    els.profileLevel.textContent = data ? String(data.level ?? 1) : "-";
+  }
+  if (els.profileExp) {
+    els.profileExp.textContent = data ? String(data.exp ?? 0) : "-";
+  }
+  if (els.profileGold) {
+    els.profileGold.textContent = data ? String(data.gold ?? 0) : "-";
+  }
+  if (els.profileDiamond) {
+    els.profileDiamond.textContent = data ? String(data.diamond ?? 0) : "-";
+  }
+  if (els.profileBackendTag) {
+    els.profileBackendTag.textContent = backendName || "-";
+  }
+}
+
+function setDailyMessage(message) {
+  if (!els.dailyMessage) {
+    return;
+  }
+  els.dailyMessage.textContent = message;
+}
+
+function renderDailyState(daily) {
+  const stateDaily = daily && typeof daily === "object" ? daily : {};
+  const signedIn = Boolean(stateDaily.signed_in);
+  const taskClaimed = Boolean(stateDaily.task_claimed);
+  const battleCount = Number(stateDaily.battle_count || 0);
+  const taskTarget = Number(stateDaily.task_target || 3);
+
+  if (els.dailySignedIn) {
+    els.dailySignedIn.textContent = signedIn ? "已签到" : "未签到";
+  }
+  if (els.dailyBattleCount) {
+    els.dailyBattleCount.textContent = `${battleCount} / ${taskTarget}`;
+  }
+  if (els.dailyTaskClaimed) {
+    els.dailyTaskClaimed.textContent = taskClaimed ? "已领取" : "未领取";
+  }
+  if (els.dailySigninBtn) {
+    els.dailySigninBtn.disabled = signedIn;
+  }
+  if (els.dailyClaimTaskBtn) {
+    els.dailyClaimTaskBtn.disabled = taskClaimed || battleCount < taskTarget;
+  }
+}
+
+function renderLeaderboard(list) {
+  if (!els.leaderboardList) {
+    return;
+  }
+  els.leaderboardList.innerHTML = "";
+  if (!Array.isArray(list) || list.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "暂无排行数据";
+    els.leaderboardList.appendChild(li);
+    return;
+  }
+
+  list.forEach((row, index) => {
+    const rank = Number(row?.rank || index + 1);
+    const account = row?.account || "-";
+    const level = Number(row?.level || 1);
+    const gold = Number(row?.gold || 0);
+
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span class="rank-badge ${rank === 1 ? "rank-top1" : ""}">${rank}</span>
+      <div class="leaderboard-main">
+        <strong>${account}</strong>
+        <small>Lv.${level}</small>
+      </div>
+      <div class="leaderboard-value">${gold}</div>
+    `;
+    els.leaderboardList.appendChild(li);
+  });
+}
+
+async function refreshDailyState() {
+  if (!state.account || !state.token) {
+    renderDailyState(null);
+    setDailyMessage("登录后可查看每日状态。");
+    return;
+  }
+  try {
+    const data = await apiRequest("/daily");
+    state.lastDaily = data?.daily || null;
+    state.profile = data?.profile || state.profile;
+    renderDailyState(state.lastDaily);
+    renderProfile(state.profile, data?.storage_backend);
+    setDailyMessage("每日状态已更新");
+  } catch (error) {
+    setDailyMessage("每日状态拉取失败");
+    setFeedback(error.payload || error.message);
+  }
+}
+
+async function refreshLeaderboard() {
+  try {
+    const data = await apiRequest("/leaderboard", {
+      headers: { "x-limit": "10" },
+    });
+    state.lastLeaderboard = Array.isArray(data?.ranking) ? data.ranking : [];
+    renderLeaderboard(state.lastLeaderboard);
+  } catch (error) {
+    setFeedback(error.payload || error.message);
+  }
+}
+
+async function doDailySignin() {
+  try {
+    const data = await apiRequest("/daily/signin", { method: "POST", body: {} });
+    state.lastDaily = data?.daily || state.lastDaily;
+    state.profile = data?.profile || state.profile;
+    renderDailyState(state.lastDaily);
+    renderProfile(state.profile, data?.storage_backend);
+    setDailyMessage("签到成功，奖励已到账");
+    setFeedback(data);
+    await refreshLeaderboard();
+  } catch (error) {
+    const message = error.payload?.message === "already_signed_in" ? "今日已签到" : "签到失败";
+    setDailyMessage(message);
+    setFeedback(error.payload || error.message);
+    await refreshDailyState();
+  }
+}
+
+async function doDailyClaimTask() {
+  try {
+    const data = await apiRequest("/daily/claim-task", { method: "POST", body: {} });
+    state.lastDaily = data?.daily || state.lastDaily;
+    state.profile = data?.profile || state.profile;
+    renderDailyState(state.lastDaily);
+    renderProfile(state.profile, data?.storage_backend);
+    setDailyMessage("任务奖励领取成功");
+    setFeedback(data);
+    await refreshLeaderboard();
+  } catch (error) {
+    const msgCode = error.payload?.message;
+    const message = msgCode === "task_not_ready" ? "任务未完成：需当日完成 3 场战斗" : msgCode === "task_already_claimed" ? "任务奖励今日已领取" : "领取失败";
+    setDailyMessage(message);
+    setFeedback(error.payload || error.message);
+    await refreshDailyState();
+  }
+}
 
 function setFeedback(data) {
   if (!els.feedback) {
@@ -561,6 +754,9 @@ function updateAuthUi() {
   els.accountBadge.textContent = authed ? `账号: ${state.account}` : "未登录";
   els.accountInput.value = state.account;
   els.tokenInput.value = state.token;
+  if (!authed) {
+    setActiveView("home");
+  }
 }
 
 function updateResultUi(session, logs, damageBoard, damageSummary) {
@@ -620,7 +816,12 @@ async function doLogin(event) {
     const data = await apiRequest("/login", { method: "POST", body: {} });
     localStorage.setItem("wg_account", state.account);
     localStorage.setItem("wg_token", state.token);
+    state.profile = data?.profile || null;
     updateAuthUi();
+    renderProfile(state.profile, data?.storage_backend);
+    setActiveView("home");
+    await refreshDailyState();
+    await refreshLeaderboard();
     setFeedback(data);
   } catch (error) {
     setFeedback(error.payload || error.message);
@@ -655,7 +856,11 @@ async function runAutoBattle() {
       method: "POST",
       body: payload,
     });
+    state.profile = data?.profile_after || state.profile;
     updateResultUi(data.session, data.battle_logs, data.damage_board, data.damage_summary);
+    renderProfile(state.profile, data?.storage_backend);
+    await refreshDailyState();
+    await refreshLeaderboard();
     setFeedback(data);
   } catch (error) {
     setFeedback(error.payload || error.message);
@@ -670,6 +875,9 @@ function logout() {
   state.token = "";
   state.lastDamageBoard = [];
   state.lastDamageSummary = null;
+  state.lastDaily = null;
+  state.lastLeaderboard = [];
+  state.profile = null;
   localStorage.removeItem("wg_account");
   localStorage.removeItem("wg_token");
   updateAuthUi();
@@ -677,6 +885,11 @@ function logout() {
   closeBattleResultModal();
   setResultBadge("-");
   els.resultHeadline.textContent = "等待战斗开始...";
+  renderDailyState(null);
+  renderLeaderboard([]);
+  renderProfile(null, "-");
+  setActiveView("home");
+  setDailyMessage("登录后可查看每日状态。");
   setFeedback("已退出登录");
 }
 
@@ -688,6 +901,17 @@ function renderConfigUi() {
   applyScenarioToEnemyTeam();
   renderSetBonusPreview();
   refreshBattleStagePreview();
+  renderDailyState(null);
+  renderLeaderboard([]);
+  renderProfile(null, "-");
+}
+
+function handleTopNavClick(event) {
+  const button = event.target.closest(".top-nav-btn");
+  if (!button) {
+    return;
+  }
+  setActiveView(button.dataset.view);
 }
 
 function bindEvents() {
@@ -712,6 +936,11 @@ function bindEvents() {
   els.scenarioSelect?.addEventListener("change", applyScenarioToEnemyTeam);
   els.userEquipSelect?.addEventListener("change", renderSetBonusPreview);
   els.enemyEquipSelect?.addEventListener("change", renderSetBonusPreview);
+  els.refreshDailyBtn?.addEventListener("click", refreshDailyState);
+  els.dailySigninBtn?.addEventListener("click", doDailySignin);
+  els.dailyClaimTaskBtn?.addEventListener("click", doDailyClaimTask);
+  els.refreshLeaderboardBtn?.addEventListener("click", refreshLeaderboard);
+  els.topNav?.addEventListener("click", handleTopNavClick);
 }
 
 async function bootstrap() {
@@ -720,6 +949,9 @@ async function bootstrap() {
   updateAuthUi();
   await loadBattleData();
   renderConfigUi();
+  setActiveView("home");
+  await refreshLeaderboard();
+  await refreshDailyState();
   await probeServer();
 }
 
